@@ -4,6 +4,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -30,14 +31,16 @@ import com.drivee.copilote.ui.dashboard.DashboardScreen
 import com.drivee.copilote.ui.history.HistoryScreen
 import com.drivee.copilote.ui.onboarding.OnboardingScreen
 import com.drivee.copilote.ui.settings.SettingsScreen
+import com.drivee.copilote.ui.stats.StatsScreen
 
 private sealed class Dest(val route: String, val label: String, val icon: ImageVector) {
-    data object Dashboard : Dest("dashboard", "Tableau de bord", Icons.Default.Home)
-    data object Settings : Dest("settings", "Paramètres", Icons.Default.Settings)
+    data object Dashboard : Dest("dashboard", "Accueil", Icons.Default.Home)
+    data object Stats : Dest("stats", "Stats", Icons.Default.Assessment)
     data object History : Dest("history", "Historique", Icons.Default.DateRange)
+    data object Settings : Dest("settings", "Réglages", Icons.Default.Settings)
 }
 
-private val tabs = listOf(Dest.Dashboard, Dest.Settings, Dest.History)
+private val tabs = listOf(Dest.Dashboard, Dest.Stats, Dest.History, Dest.Settings)
 
 @Composable
 fun DriveeNavHost() {
@@ -100,6 +103,7 @@ private fun MainScaffold() {
             modifier = Modifier.padding(padding)
         ) {
             composable(Dest.Dashboard.route) { DashboardScreen() }
+            composable(Dest.Stats.route) { StatsScreen() }
             composable(Dest.Settings.route) { SettingsScreen() }
             composable(Dest.History.route) { HistoryScreen() }
         }

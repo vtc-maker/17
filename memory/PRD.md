@@ -52,6 +52,14 @@ service (AccessibilityService + RideParser + OverlayService), ui (Compose : dash
   `FileProvider` (aucune permission de stockage), bouton "Exporter CSV" dans l'historique
   exportant les courses de la période filtrée.
 
+## Ajouts (2026-06, itération 3)
+- Onglet "Stats" (4e tab) : `StatsViewModel` agrège l'historique des 6 dernières semaines.
+- `StatsScreen` : graphes à barres (Canvas, sans dépendance externe) du revenu net par jour
+  (semaine en cours) et par semaine (6 dernières), + cartes résumé (net, courses, moyenne €/h).
+- `WeeklySummary` : génère un récap hebdomadaire texte + pièce jointe CSV de la semaine,
+  partageable en un tap via `FileProvider` (bouton "Partager le récap hebdo").
+- Navigation passée à 4 onglets : Accueil / Stats / Historique / Réglages.
+
 ## Notes
 - Non exécutable sur Expo/preview ; ouvrir dans Android Studio, tester sur appareil réel.
 - Aucune donnée d'écran transmise en ligne (traitement 100 % local).
