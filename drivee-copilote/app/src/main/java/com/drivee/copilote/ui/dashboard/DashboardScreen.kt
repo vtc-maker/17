@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
+import com.drivee.copilote.ui.onboarding.DisclosureBody
+import com.drivee.copilote.ui.onboarding.DisclosureText
 
 /**
  * Écran "Tableau de bord" : état des permissions critiques + boutons d'activation.
@@ -44,6 +48,7 @@ fun DashboardScreen() {
 
     var a11yEnabled by remember { mutableStateOf(PermissionChecker.isAccessibilityEnabled(context)) }
     var overlayEnabled by remember { mutableStateOf(PermissionChecker.canDrawOverlays(context)) }
+    var showDisclosure by remember { mutableStateOf(false) }
 
     // Rafraîchit l'état des permissions au retour dans l'app.
     DisposableEffect(lifecycleOwner) {
@@ -86,7 +91,7 @@ fun DashboardScreen() {
             description = "Autorise l'app à lire les offres affichées par Uber / Bolt afin de calculer la rentabilité. Aucune donnée n'est envoyée en ligne.",
             granted = a11yEnabled,
             actionLabel = if (a11yEnabled) "Activé" else "Activer",
-            onClick = { openAccessibilitySettings(context) }
+            onClick = { showDisclosure = true }
         )
 
         Spacer(Modifier.height(12.dp))
@@ -107,6 +112,25 @@ fun DashboardScreen() {
             granted = false,
             actionLabel = "Configurer",
             onClick = { openBatterySettings(context) }
+        )
+    }
+
+    // Divulgation (Prominent Disclosure) affichée AVANT toute redirection vers
+    // les réglages d'accessibilité — exigence Google Play.
+    if (showDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showDisclosure = false },
+            title = { Text(DisclosureText.TITLE) },
+            text = { DisclosureBody() },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDisclosure = false
+                    openAccessibilitySettings(context)
+                }) { Text("J'accepte et j'active") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisclosure = false }) { Text("Refuser") }
+            }
         )
     }
 }

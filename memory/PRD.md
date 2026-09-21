@@ -38,11 +38,19 @@ service (AccessibilityService + RideParser + OverlayService), ui (Compose : dash
 - PRIVACY_POLICY_FR.md : Prominent Disclosure + politique de confidentialité + justif Play Console.
 
 ## Backlog / prochaines étapes
-- P1 : mise à jour distante de ParserConfig (JSON téléchargé + cache) pour suivre les changements d'UI VTC.
-- P1 : écran d'onboarding affichant la Prominent Disclosure avant redirection accessibilité.
-- P2 : export CSV de l'historique, stats par jour/semaine, graphes.
+- P2 : mise à jour distante de ParserConfig (JSON téléchargé + cache) pour suivre les changements d'UI VTC.
+- P2 : stats par jour/semaine, graphes de rentabilité.
 - P2 : profils de véhicule multiples, détection auto brut/net par plateforme.
 - P2 : réglage de la taille/position mémorisée de la vignette.
+
+## Ajouts (2026-06, itération 2)
+- Onboarding : écran d'accueil `OnboardingScreen` + `DisclosureText`/`DisclosureBody` réutilisables,
+  flag persistant `OnboardingPrefs` (SharedPreferences). Divulgation affichée avant toute
+  redirection vers les réglages d'accessibilité (gate au 1er lancement + boîte de dialogue sur
+  le tableau de bord). Conforme à l'exigence Google Play.
+- Export CSV : `CsvExporter` (séparateur ';', décimales virgule, BOM UTF-8), partage via
+  `FileProvider` (aucune permission de stockage), bouton "Exporter CSV" dans l'historique
+  exportant les courses de la période filtrée.
 
 ## Notes
 - Non exécutable sur Expo/preview ; ouvrir dans Android Studio, tester sur appareil réel.
