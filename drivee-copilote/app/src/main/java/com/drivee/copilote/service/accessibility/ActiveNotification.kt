@@ -22,9 +22,11 @@ import com.drivee.copilote.ui.MainActivity
 object ActiveNotification {
     private const val CHANNEL_ID = "drivee_active"
     private const val NOTIF_ID = 4242
+    const val ACTION_TOGGLE_PAUSE = "com.drivee.copilote.TOGGLE_PAUSE"
+    const val ACTION_STOP = "com.drivee.copilote.STOP"
 
     @SuppressLint("MissingPermission")
-    fun show(context: Context) {
+    fun show(context: Context, paused: Boolean = ServiceState.isPaused(context)) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID, "Analyse des offres", NotificationManager.IMPORTANCE_LOW
@@ -47,10 +49,17 @@ object ActiveNotification {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        fun action(action: String, code: Int) = PendingIntent.getBroadcast(
+            context, code, Intent(action).setPackage(context.packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Drivee actif")
-            .setContentText("Analyse des offres en cours…")
+            .setContentTitle(if (paused) "Drivee en pause" else "Drivee actif")
+            .setContentText(if (paused) "Analyse suspendue — touchez Reprendre" else "Analyse des offres en cours…")
+            .addAction(0, if (paused) "Reprendre" else "Pause", action(ACTION_TOGGLE_PAUSE, 1))
+            .addAction(0, "Arrêter", action(ACTION_STOP, 2))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

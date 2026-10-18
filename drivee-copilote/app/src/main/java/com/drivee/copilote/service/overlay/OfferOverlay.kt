@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -100,6 +101,15 @@ class OfferOverlay(private val context: Context) {
 
     fun hide() {
         main.post { removeNow() }
+    }
+
+    /** Zone occupée par la pop-up à l'écran (exclue de l'OCR pour ne pas relire nos propres chiffres). */
+    fun visibleRect(): Rect? {
+        val v = root ?: return null
+        if (v.width == 0) return null
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        return Rect(loc[0], loc[1], loc[0] + v.width, loc[1] + v.height)
     }
 
     // ------------------------------------------------------------------

@@ -181,6 +181,22 @@ class RideParserTest {
     }
 
     @Test
+    fun `OCR Uber - gains 0,00 euro en haut ignores, prix de l'offre retenu`() {
+        val ocrLines = listOf(
+            "18:25", "0,00€", "Vous êtes en ligne.",
+            "Comfort", "Exclusivité", "39,71 €", "4,81", "Montant net de frais",
+            "11 min (4.5 km)", "Terminal 1, Terminal 1 - D4, 06206, Nice",
+            "Course de 28.1 km", "52 Bd d'Italie, 98000, Monaco", "Accepter"
+        )
+
+        val offer = parser.parseTexts(ocrLines, "com.ubercab.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(39.71, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(32.6, offer.totalDistanceKm!!, 0.001)
+    }
+
+    @Test
     fun `video Uber Nice-Monaco - approche avec duree, course avec seulement les km`() {
         val texts = listOf(
             "Comfort", "Exclusivité", "39,71 €", "4,81", "Montant net de frais",

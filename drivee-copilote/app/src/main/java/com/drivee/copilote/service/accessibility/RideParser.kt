@@ -32,6 +32,7 @@ class RideParser @Inject constructor() {
         private const val MAX_NODES = 4000         // garde-fou perf (la carte peut contenir beaucoup de nœuds)
         private const val DEBUG_DUMP = false       // passer à true pour logger les textes
         private val NUMBER_REGEX = Regex("(\\d+(?:[.,]\\d{1,2})?)")
+        private val UNIT_REGEX = Regex("(?i)\\d[\\s\\u00A0\\u202F]*(?:km|min|m)\\b")
     }
 
     /** Résultat interne du parcours d'arbre. */
@@ -172,8 +173,16 @@ class RideParser @Inject constructor() {
                 parseNumber(NUMBER_REGEX.find(raw)?.groupValues?.getOrNull(1))?.let { return it }
             }
         }
-        val joined = harvest.texts.joinToString("\n")
-        return extractNumber(joined, rules.pricePatterns)
+        // Plusieurs montants possibles (ex : "0,00 €" des gains du jour en haut d'écran) :
+        // on garde le montant > 0 le plus PROCHE de la 1re ligne "X min / X km" de la carte d'offre.
+        val lines = harvest.texts
+        val candidates = lines.withIndex().mapNotNull { (i, line) ->
+            extractNumber(line, rules.pricePatterns)?.takeIf { it > 0.0 }?.let { i to it }
+        }
+        if (candidates.isEmpty()) return null
+        val ref = lines.indexOfFirst { UNIT_REGEX.containsMatchIn(it) }
+        if (ref < 0) return candidates.first().second
+        return candidates.minByOrNull { kotlin.math.abs(it.first - ref) }?.second
     }
 
     private fun extractNumber(text: String, patterns: List<String>): Double? {

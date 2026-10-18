@@ -1,14 +1,21 @@
 package com.drivee.copilote.service.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.drivee.copilote.data.repository.RideRepository
 import com.drivee.copilote.data.repository.SettingsRepository
 import com.drivee.copilote.domain.engine.ProfitabilityEngine
 import com.drivee.copilote.domain.model.Platforms
+import com.drivee.copilote.domain.model.RideOffer
+import com.drivee.copilote.service.overlay.FloatingBubble
 import com.drivee.copilote.service.overlay.OfferDisplay
 import com.drivee.copilote.service.overlay.OfferOverlay
 import com.drivee.copilote.service.overlay.VerdictSound
@@ -25,17 +32,14 @@ import javax.inject.Inject
 /**
  * SERVICE D'ACCESSIBILITÉ — lit les offres Uber / Bolt / Heetch et affiche la pop-up.
  *
- * Ce service est lié par le système dès que l'utilisateur l'active : il tourne donc
- * en permanence en arrière-plan, sans foreground service. La pop-up est une fenêtre
- * TYPE_ACCESSIBILITY_OVERLAY gérée par [OfferOverlay].
+ * Lecture en 2 temps :
+ *  1. NŒUDS d'accessibilité (rapide, toutes les 250 ms max) ;
+ *  2. si aucune offre n'est trouvée : OCR embarqué d'une capture d'écran (Android 11+,
+ *     1 fois / s max). Indispensable quand l'app VTC n'expose pas les textes de sa carte
+ *     d'offre (constaté sur Uber : seul l'écran d'accueil est lisible).
  *
- * Robustesse :
- *  - anti-rebond (debounce) : on analyse l'écran 250 ms après le DERNIER événement
- *    (on ne rate jamais l'état final de la carte d'offre) ;
- *  - parcours de TOUTES les fenêtres de l'app VTC (la carte d'offre est souvent une
- *    fenêtre séparée) ;
- *  - masquage différé (1,2 s) quand l'offre disparaît, pour éviter le clignotement ;
- *  - déduplication et try/catch partout : le service ne doit jamais crasher.
+ * Throttle (et non debounce) : la carte Uber/Bolt se rafraîchit en continu.
+ * Bulle flottante = service actif ; un appui met en pause / reprend.
  */
 @AndroidEntryPoint
 class RideAccessibilityService : AccessibilityService() {
@@ -48,27 +52,55 @@ class RideAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val overlay by lazy { OfferOverlay(this) }
     private val sound by lazy { VerdictSound(this) }
+    private val ocr by lazy { ScreenOcr(this) }
+    private val bubble by lazy { FloatingBubble(this) { togglePause() } }
 
     private var analyzeJob: Job? = null
     private var hideJob: Job? = null
     private var lastOfferSignature: String? = null
+    @Volatile private var lastEventPkg: String? = null
     private var demoIndex = 0
+
+    private val actionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                ActiveNotification.ACTION_TOGGLE_PAUSE -> togglePause()
+                ActiveNotification.ACTION_STOP -> disableSelf()
+            }
+        }
+    }
 
     companion object {
         private const val TAG = "RideA11yService"
-        private const val DEBOUNCE_MS = 250L
-        private const val HIDE_DELAY_MS = 1_200L
+        private const val THROTTLE_MS = 250L
+        private const val HIDE_DELAY_MS = 1_500L
 
         @Volatile
         private var instance: RideAccessibilityService? = null
 
-        /** Le service est-il réellement lié et actif (pas seulement coché dans les réglages) ? */
         val isRunning: Boolean get() = instance != null
+        val ocrSupported: Boolean get() = instance?.ocr?.isSupported ?: (android.os.Build.VERSION.SDK_INT >= 30)
 
-        /** Affiche une offre d'exemple (Uber, Heetch, Bolt en alternance). false si service inactif. */
         fun showDemo(): Boolean {
             val service = instance ?: return false
             service.showNextDemo()
+            return true
+        }
+
+        fun setPaused(context: Context, paused: Boolean) {
+            ServiceState.setPaused(context, paused)
+            instance?.applyState()
+        }
+
+        fun setBubbleEnabled(context: Context, enabled: Boolean) {
+            ServiceState.setBubbleEnabled(context, enabled)
+            instance?.applyState()
+        }
+
+        /** Arrête complètement le service (il faudra le réactiver dans Accessibilité). */
+        fun stop(): Boolean {
+            val service = instance ?: return false
+            service.disableSelf()
             return true
         }
     }
@@ -76,22 +108,46 @@ class RideAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        ActiveNotification.show(this)
+        ContextCompat.registerReceiver(
+            this, actionReceiver,
+            IntentFilter().apply {
+                addAction(ActiveNotification.ACTION_TOGGLE_PAUSE)
+                addAction(ActiveNotification.ACTION_STOP)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        applyState()
         Log.i(TAG, "Service d'accessibilité connecté.")
+    }
+
+    /** Synchronise bulle, notification et pop-up avec l'état pause / bulle. */
+    private fun applyState() {
+        val paused = ServiceState.isPaused(this)
+        if (paused) {
+            overlay.hide()
+            lastOfferSignature = null
+        }
+        if (ServiceState.isBubbleEnabled(this)) bubble.show(active = !paused) else bubble.hide()
+        ActiveNotification.show(this, paused)
+    }
+
+    private fun togglePause() {
+        val paused = !ServiceState.isPaused(this)
+        ServiceState.setPaused(this, paused)
+        applyState()
+        Toast.makeText(this, if (paused) "Drivee en pause" else "Drivee actif", Toast.LENGTH_SHORT).show()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
         if (pkg !in Platforms.packages) return
-
         Diagnostics.onEvent(pkg)
+        if (ServiceState.isPaused(this)) return
+        lastEventPkg = pkg
 
-        // Throttle (et NON debounce) : la carte Uber/Bolt se rafraîchit en continu, un debounce
-        // serait relancé sans fin et l'écran ne serait jamais analysé. On analyse au plus
-        // toutes les 250 ms, en lisant l'écran au moment de l'analyse (état le plus récent).
         if (analyzeJob?.isActive == true) return
         analyzeJob = scope.launch {
-            delay(DEBOUNCE_MS)
+            delay(THROTTLE_MS)
             try {
                 handleScreen()
             } catch (t: Throwable) {
@@ -102,12 +158,21 @@ class RideAccessibilityService : AccessibilityService() {
 
     private suspend fun handleScreen() {
         val roots = collectRoots()
-        val pkg = roots.firstOrNull()?.packageName?.toString()
-        val parsed = pkg?.let {
-            parser.parseRoots(roots.filter { r -> r.packageName?.toString() == it }, it, settingsRepository.getParserConfig())
-        }
+        val pkg = roots.firstOrNull()?.packageName?.toString() ?: lastEventPkg ?: return
+        val config = settingsRepository.getParserConfig()
 
-        Diagnostics.onAnalysis(pkg, roots.size, parser.lastTexts, parsed)
+        // 1) Nœuds d'accessibilité.
+        val sameApp = roots.filter { it.packageName?.toString() == pkg }
+        var parsed: RideOffer? = parser.parseRoots(sameApp, pkg, config)
+        Diagnostics.onAnalysis("NŒUDS", pkg, roots.size, parser.lastTexts, parsed)
+
+        // 2) Plan B : OCR de l'écran (nos propres fenêtres exclues).
+        if (parsed == null) {
+            val lines = ocr.readLines(listOfNotNull(overlay.visibleRect(), bubble.visibleRect()))
+                ?: return // capture trop récente : on ne décide rien, prochaine analyse dans 250 ms
+            parsed = parser.parseTexts(lines, pkg, config)
+            Diagnostics.onAnalysis("OCR", pkg, roots.size, lines, parsed)
+        }
 
         if (parsed == null) {
             scheduleHide()
@@ -116,13 +181,12 @@ class RideAccessibilityService : AccessibilityService() {
         hideJob?.cancel()
         hideJob = null
 
-        // Déduplication : même offre -> rien à refaire.
-        val signature = "${parsed.sourcePackage}|${parsed.grossPriceEuros}|${parsed.totalDistanceKm}|${parsed.totalTimeMin}"
+        // Déduplication (prix seul : l'OCR peut lire les km légèrement différemment d'une image à l'autre).
+        val signature = "${parsed.sourcePackage}|${parsed.grossPriceEuros}"
         if (signature == lastOfferSignature) return
         lastOfferSignature = signature
 
         val settings = settingsRepository.getSettings()
-        // Bolt n'affiche pas la durée de course : estimation depuis la distance.
         val offer = parsed.withEstimatedTimes(settings.avgSpeedKmh)
         val metrics = engine.compute(offer, settings)
         overlay.show(OfferDisplay.from(offer, metrics))
@@ -177,9 +241,13 @@ class RideAccessibilityService : AccessibilityService() {
     }
 
     private fun shutdown() {
-        if (instance === this) instance = null
+        if (instance !== this) return
+        instance = null
+        runCatching { unregisterReceiver(actionReceiver) }
         overlay.hide()
+        bubble.hide()
         sound.release()
+        ocr.release()
         ActiveNotification.cancel(this)
         scope.cancel()
     }

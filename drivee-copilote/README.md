@@ -227,6 +227,13 @@ Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confir
 6. **Bolt** n'affiche pas la durée de la course : elle est estimée avec la *vitesse moyenne* des Réglages (35 km/h par défaut) et s'affiche avec « ~ » (ex. `~62 min · 36 km`). Les distances en mètres (`135 m`) sont reconnues.
 5. La course analysée est **enregistrée dans l'Historique** quelle que soit votre décision (accepter ou non).
 
+### 4.3 bis Bulle, pause et arrêt
+
+- **Bulle « D »** flottante (comme Uber/Bolt) : anneau **vert** = analyse active, **gris** = en pause. Un appui = pause / reprise, glisser = déplacer. Désactivable dans le Tableau de bord.
+- **Notification** *Drivee actif* : boutons **Pause / Reprendre** et **Arrêter** (arrêt complet du service ; à réactiver ensuite dans *Accessibilité*).
+- **Lecture des offres** : d'abord les textes d'accessibilité, puis, si l'app VTC les masque (cas constaté sur Uber), **lecture de l'écran par OCR embarqué** (ML Kit, hors ligne, Android 11+, 1 capture/s max, la pop-up et la bulle sont exclues).
+- **Diagnostic** (Tableau de bord) : résultat de la lecture par NŒUDS et par OCR + bouton Partager.
+
 ### 4.4 Historique 📋
 
 - Filtres **Aujourd'hui / 7 jours / Tout**.

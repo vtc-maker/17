@@ -87,3 +87,4 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 
 - 2026-10-18: Refonte pop-up (style Drivee: plateforme · €/km · prix · €/h · min·km · jauge SUPER/MOYEN/MAUVAIS + seuil rentable), affichée par le service d'accessibilité (TYPE_ACCESSIBILITY_OVERLAY, plus de FGS/SYSTEM_ALERT_WINDOW), notification 'Drivee actif' au connect, Heetch ajouté, verdict = pire de €/km (seuil 1€) et €/h (seuil 30€), zone MOYEN 80%, bouton Tester la pop-up. DB v2.
 - 2026-10-18: Son du verdict (AudioTrack synthétisé, guidage nav), Bolt: mètres + durée estimée (vitesse moyenne 35 km/h, '~'), tests captures réelles Uber/Bolt. DB v3.
+- 2026-10-18: Diagnostic utilisateur = Uber n'expose pas la carte d'offre dans l'arbre a11y. Ajout OCR ML Kit (takeScreenshot API30+), isAccessibilityTool, prix = montant le plus proche des lignes km/min, bulle flottante D (pause/reprise), notification Pause/Arrêter, contrôles Dashboard.

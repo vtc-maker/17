@@ -8,21 +8,21 @@ import java.util.Locale
 
 /**
  * Journal de diagnostic en mémoire (rien n'est envoyé en ligne) :
- * événements reçus par application, dernière analyse, textes lus et résultat.
- * Affiché sur le tableau de bord pour comprendre pourquoi une offre n'est pas détectée.
+ * événements reçus, dernière lecture par les NŒUDS d'accessibilité et par l'OCR,
+ * textes lus et résultat. Partageable depuis le tableau de bord.
  */
 object Diagnostics {
 
+    class Capture(val at: Long, val pkg: String?, val windows: Int, val texts: List<String>, val result: String)
+
     private val eventCounts = mutableMapOf<String, Int>()
+    private val anchor = Regex("(?i)accepter|refuser|\\baccept")
 
-    @Volatile var lastAnalysisAt: Long = 0L; private set
-    @Volatile var lastPackage: String? = null; private set
-    @Volatile var lastWindowCount: Int = 0; private set
-    @Volatile var lastTexts: List<String> = emptyList(); private set
-    @Volatile var lastResult: String = "Aucune analyse pour l'instant"; private set
-
-    /** Dernière capture qui contenait un bouton Accepter/Refuser (la plus utile à partager). */
-    @Volatile var lastOfferLikeTexts: List<String> = emptyList(); private set
+    @Volatile var lastNodes: Capture? = null; private set
+    @Volatile var lastOcr: Capture? = null; private set
+    /** Dernière capture (nœuds ou OCR) où un bouton Accepter/Refuser était visible. */
+    @Volatile var lastOfferLike: Capture? = null; private set
+    @Volatile var lastDetected: String? = null; private set
 
     @Synchronized
     fun onEvent(pkg: String) {
@@ -34,36 +34,34 @@ object Diagnostics {
         if (eventCounts.isEmpty()) "aucun"
         else eventCounts.entries.joinToString(" · ") { "${Platforms.label(it.key)} ${it.value}" }
 
-    fun onAnalysis(pkg: String?, windows: Int, texts: List<String>, offer: RideOffer?) {
-        lastAnalysisAt = System.currentTimeMillis()
-        lastPackage = pkg
-        lastWindowCount = windows
-        lastTexts = texts
-        if (texts.any { Regex("(?i)accepter|refuser|\\baccept").containsMatchIn(it) }) {
-            lastOfferLikeTexts = texts
+    fun onAnalysis(source: String, pkg: String?, windows: Int, texts: List<String>, offer: RideOffer?) {
+        val result = when {
+            pkg == null -> "aucune fenêtre lisible"
+            offer == null -> "pas d'offre (${texts.size} textes)"
+            else -> "OFFRE ${offer.grossPriceEuros} € · ${offer.totalDistanceKm ?: "?"} km · ${offer.totalTimeMin ?: "?"} min"
         }
-        lastResult = when {
-            pkg == null -> "Aucune fenêtre Uber/Bolt/Heetch lisible"
-            offer == null -> "${Platforms.label(pkg)} : pas d'offre reconnue (${texts.size} textes lus)"
-            else -> "${Platforms.label(pkg)} : offre ${offer.grossPriceEuros} € · " +
-                "${offer.totalDistanceKm ?: "?"} km · ${offer.totalTimeMin ?: "?"} min"
+        val capture = Capture(System.currentTimeMillis(), pkg, windows, texts, "$source : $result")
+        if (source == "OCR") lastOcr = capture else lastNodes = capture
+        if (texts.any { anchor.containsMatchIn(it) }) lastOfferLike = capture
+        if (offer != null) lastDetected = "${time(capture.at)} ${capture.result}"
+    }
+
+    fun summary(serviceRunning: Boolean, ocrSupported: Boolean): String =
+        "Service : ${if (serviceRunning) "actif" else "inactif"} · OCR : ${if (ocrSupported) "oui" else "non (Android < 11)"}\n" +
+            "Événements reçus : ${eventSummary()}\n" +
+            "Nœuds : ${lastNodes?.result ?: "—"}\n" +
+            "OCR : ${lastOcr?.result ?: "—"}\n" +
+            "Dernière offre détectée : ${lastDetected ?: "aucune"}"
+
+    fun report(serviceRunning: Boolean, ocrSupported: Boolean): String = buildString {
+        appendLine("Drivee Copilote — diagnostic")
+        appendLine(summary(serviceRunning, ocrSupported))
+        listOf("OFFRE (Accepter visible)" to lastOfferLike, "NŒUDS" to lastNodes, "OCR" to lastOcr).forEach { (title, c) ->
+            appendLine()
+            appendLine("--- $title ${c?.let { "${time(it.at)} · ${it.windows} fenêtre(s) · ${it.result}" } ?: "—"} ---")
+            c?.texts?.forEach { appendLine(it) }
         }
     }
 
-    /** Rapport texte complet, à partager. */
-    fun report(serviceRunning: Boolean): String = buildString {
-        val time = if (lastAnalysisAt == 0L) "—"
-        else SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date(lastAnalysisAt))
-        appendLine("Drivee Copilote — diagnostic")
-        appendLine("Service actif : ${if (serviceRunning) "oui" else "NON"}")
-        appendLine("Événements reçus : ${eventSummary()}")
-        appendLine("Dernière analyse : $time (${lastWindowCount} fenêtre(s))")
-        appendLine("Résultat : $lastResult")
-        appendLine()
-        appendLine("--- Textes de la dernière offre (Accepter/Refuser visible) ---")
-        lastOfferLikeTexts.forEach { appendLine(it) }
-        appendLine()
-        appendLine("--- Textes de la dernière analyse ---")
-        lastTexts.forEach { appendLine(it) }
-    }
+    private fun time(ms: Long) = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date(ms))
 }

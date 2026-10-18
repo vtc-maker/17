@@ -23,6 +23,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +42,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.drivee.copilote.service.accessibility.ActiveNotification
 import com.drivee.copilote.service.accessibility.Diagnostics
+import com.drivee.copilote.service.accessibility.ServiceState
 import com.drivee.copilote.service.accessibility.RideAccessibilityService
 import com.drivee.copilote.ui.onboarding.DisclosureBody
 import com.drivee.copilote.ui.onboarding.DisclosureText
@@ -61,9 +63,13 @@ fun DashboardScreen() {
     var showDisclosure by remember { mutableStateOf(false) }
     var notifAskedOnce by remember { mutableStateOf(false) }
     var diagSummary by remember { mutableStateOf(diagnosticSummary()) }
+    var paused by remember { mutableStateOf(ServiceState.isPaused(context)) }
+    var bubbleOn by remember { mutableStateOf(ServiceState.isBubbleEnabled(context)) }
 
     fun refresh() {
         diagSummary = diagnosticSummary()
+        paused = ServiceState.isPaused(context)
+        bubbleOn = ServiceState.isBubbleEnabled(context)
         a11yEnabled = PermissionChecker.isAccessibilityEnabled(context)
         serviceRunning = RideAccessibilityService.isRunning
         notifOk = PermissionChecker.areNotificationsEnabled(context)
@@ -107,6 +113,34 @@ fun DashboardScreen() {
 
         Spacer(Modifier.height(24.dp))
 
+        if (serviceRunning) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    SwitchRow(
+                        title = "Analyse des offres",
+                        subtitle = if (paused) "En pause — aucune pop-up" else "Active",
+                        checked = !paused
+                    ) { on ->
+                        RideAccessibilityService.setPaused(context, !on)
+                        paused = !on
+                    }
+                    SwitchRow(
+                        title = "Bulle flottante",
+                        subtitle = "Pastille « D » à l'écran : un appui = pause / reprise",
+                        checked = bubbleOn
+                    ) { on ->
+                        RideAccessibilityService.setBubbleEnabled(context, on)
+                        bubbleOn = on
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = {
+                        RideAccessibilityService.stop()
+                        refresh()
+                    }) { Text("Arrêter le service") }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         PermissionCard(
             title = "Service d'accessibilité",
             description = when {
@@ -223,6 +257,20 @@ fun DashboardScreen() {
 }
 
 @Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
 private fun PermissionCard(
     title: String,
     description: String,
@@ -264,15 +312,13 @@ private fun PermissionCard(
 }
 
 private fun diagnosticSummary(): String =
-    "Service : ${if (RideAccessibilityService.isRunning) "actif" else "inactif"}\n" +
-        "Événements reçus : ${Diagnostics.eventSummary()}\n" +
-        "Dernier résultat : ${Diagnostics.lastResult}"
+    Diagnostics.summary(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported)
 
 private fun shareDiagnostic(context: Context) {
     val send = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
         .putExtra(Intent.EXTRA_SUBJECT, "Diagnostic Drivee Copilote")
-        .putExtra(Intent.EXTRA_TEXT, Diagnostics.report(RideAccessibilityService.isRunning))
+        .putExtra(Intent.EXTRA_TEXT, Diagnostics.report(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported))
     runCatching { context.startActivity(Intent.createChooser(send, "Partager le diagnostic")) }
 }
 

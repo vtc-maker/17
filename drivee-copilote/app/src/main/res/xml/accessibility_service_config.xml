@@ -20,6 +20,10 @@
     minimiser l'empreinte (performance + respect de la vie privée).
     Retirer cet attribut ferait écouter TOUTES les apps (déconseillé).
 
+    canTakeScreenshot (API 30+) : capture d'écran lue par OCR embarqué (ML Kit) quand l'app VTC
+    n'expose pas ses textes. isAccessibilityTool : requis depuis Android 14 pour lire les vues
+    marquées "accessibilityDataSensitive".
+
     notificationTimeout : anti-rebond. 100 ms évite de traiter chaque micro-changement.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
@@ -27,6 +31,8 @@
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagDefault"
     android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
+    android:isAccessibilityTool="true"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="50"
     android:packageNames="com.ubercab.driver,ee.mtakso.driver,com.heetch.driver"

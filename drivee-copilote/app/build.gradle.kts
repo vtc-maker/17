@@ -72,6 +72,9 @@ dependencies {
     // AndroidX de base
     implementation("androidx.core:core-ktx:1.12.0")
 
+    // OCR embarqué (hors ligne) : lecture de l'offre à l'écran quand Uber/Bolt masquent leurs textes
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
     // Tests unitaires (moteur de rentabilité)
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
