@@ -12,12 +12,12 @@ object DisclosureText {
     const val INTRO =
         "Pour vous aider à décider en une seconde si une course est rentable, Drivee Copilote " +
             "a besoin de lire à l'écran les informations de l'offre affichée par votre " +
-            "application VTC (Uber, Bolt) : prix proposé, distances et durées d'approche et de " +
+            "application VTC (Uber, Bolt, Heetch) : prix proposé, distances et durées d'approche et de " +
             "course, zones de départ et de destination."
 
     val WE_DO = listOf(
         "Nous lisons uniquement les écrans des applications VTC sélectionnées.",
-        "Nous calculons localement la rentabilité (€/km, €/h) et l'affichons dans une vignette, " +
+        "Nous calculons localement la rentabilité (€/km, €/h) et l'affichons dans une pop-up, " +
             "pour limiter la manipulation du téléphone en conduisant."
     )
 

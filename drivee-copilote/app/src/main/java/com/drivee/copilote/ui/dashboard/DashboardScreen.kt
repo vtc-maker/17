@@ -1,9 +1,14 @@
 package com.drivee.copilote.ui.dashboard
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,12 +39,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
+import com.drivee.copilote.service.accessibility.ActiveNotification
+import com.drivee.copilote.service.accessibility.RideAccessibilityService
 import com.drivee.copilote.ui.onboarding.DisclosureBody
 import com.drivee.copilote.ui.onboarding.DisclosureText
 
 /**
- * Écran "Tableau de bord" : état des permissions critiques + boutons d'activation.
+ * Écran "Tableau de bord" : état du service + permissions + test de la pop-up.
  * L'état est ré-évalué à chaque retour au premier plan (ON_RESUME).
  */
 @Composable
@@ -47,24 +54,33 @@ fun DashboardScreen() {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var a11yEnabled by remember { mutableStateOf(PermissionChecker.isAccessibilityEnabled(context)) }
-    var overlayEnabled by remember { mutableStateOf(PermissionChecker.canDrawOverlays(context)) }
+    var serviceRunning by remember { mutableStateOf(RideAccessibilityService.isRunning) }
+    var notifOk by remember { mutableStateOf(PermissionChecker.areNotificationsEnabled(context)) }
     var batteryOk by remember { mutableStateOf(PermissionChecker.isIgnoringBatteryOptimizations(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
+    var notifAskedOnce by remember { mutableStateOf(false) }
 
-    // Rafraîchit l'état des permissions au retour dans l'app.
+    fun refresh() {
+        a11yEnabled = PermissionChecker.isAccessibilityEnabled(context)
+        serviceRunning = RideAccessibilityService.isRunning
+        notifOk = PermissionChecker.areNotificationsEnabled(context)
+        batteryOk = PermissionChecker.isIgnoringBatteryOptimizations(context)
+        if (serviceRunning && notifOk) ActiveNotification.show(context)
+    }
+
+    val notifLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refresh() }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                a11yEnabled = PermissionChecker.isAccessibilityEnabled(context)
-                overlayEnabled = PermissionChecker.canDrawOverlays(context)
-                batteryOk = PermissionChecker.isIgnoringBatteryOptimizations(context)
-            }
+            if (event == Lifecycle.Event.ON_RESUME) refresh()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val allReady = a11yEnabled && overlayEnabled
+    val ready = a11yEnabled && serviceRunning
 
     Column(
         modifier = Modifier
@@ -80,9 +96,9 @@ fun DashboardScreen() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = if (allReady) "Prêt · analyse des offres active"
+            text = if (ready) "● Actif · analyse des offres Uber, Bolt, Heetch"
             else "Configuration requise pour démarrer",
-            color = if (allReady) MaterialTheme.colorScheme.primary
+            color = if (ready) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -90,20 +106,31 @@ fun DashboardScreen() {
 
         PermissionCard(
             title = "Service d'accessibilité",
-            description = "Autorise l'app à lire les offres affichées par Uber / Bolt afin de calculer la rentabilité. Aucune donnée n'est envoyée en ligne.",
-            granted = a11yEnabled,
-            actionLabel = if (a11yEnabled) "Activé" else "Activer",
-            onClick = { showDisclosure = true }
+            description = when {
+                ready -> "Le service tourne en arrière-plan et lit les offres pour calculer leur rentabilité. Aucune donnée n'est envoyée en ligne."
+                a11yEnabled -> "Le service est coché mais ne tourne pas. Désactivez-le puis réactivez-le dans les réglages d'accessibilité."
+                else -> "Autorise l'app à lire les offres affichées par Uber / Bolt / Heetch afin de calculer la rentabilité. Aucune donnée n'est envoyée en ligne."
+            },
+            granted = ready,
+            actionLabel = if (ready) "Activé" else "Activer",
+            onClick = { if (a11yEnabled) openAccessibilitySettings(context) else showDisclosure = true }
         )
 
         Spacer(Modifier.height(12.dp))
 
         PermissionCard(
-            title = "Affichage par-dessus les apps",
-            description = "Nécessaire pour afficher la vignette flottante de rentabilité au-dessus de l'application VTC.",
-            granted = overlayEnabled,
-            actionLabel = if (overlayEnabled) "Accordé" else "Autoriser",
-            onClick = { openOverlaySettings(context) }
+            title = "Notifications",
+            description = "Affiche la notification « Drivee actif » pour savoir d'un coup d'œil que l'analyse tourne.",
+            granted = notifOk,
+            actionLabel = if (notifOk) "Autorisé" else "Autoriser",
+            onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifAskedOnce) {
+                    notifAskedOnce = true
+                    notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    openNotificationSettings(context)
+                }
+            }
         )
 
         Spacer(Modifier.height(12.dp))
@@ -115,6 +142,31 @@ fun DashboardScreen() {
             actionLabel = if (batteryOk) "Exclu" else "Configurer",
             onClick = { openBatterySettings(context) }
         )
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "Tester la pop-up",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Affiche une offre d'exemple (Uber, Heetch, Bolt à chaque appui) avec vos seuils. Appuyez sur la pop-up pour la fermer, glissez-la pour la déplacer.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = {
+                    if (!RideAccessibilityService.showDemo()) {
+                        Toast.makeText(context, "Activez d'abord le service d'accessibilité", Toast.LENGTH_LONG).show()
+                    }
+                }) { Text("Afficher un exemple") }
+            }
+        }
     }
 
     // Divulgation (Prominent Disclosure) affichée AVANT toute redirection vers
@@ -182,11 +234,13 @@ private fun openAccessibilitySettings(context: Context) {
     runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
 }
 
-private fun openOverlaySettings(context: Context) {
-    val intent = Intent(
-        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-        Uri.parse("package:${context.packageName}")
-    )
+private fun openNotificationSettings(context: Context) {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    } else {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+    }
     runCatching { context.startActivity(intent) }
 }
 

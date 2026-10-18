@@ -106,13 +106,13 @@ Le projet utilise **Java 17**. Android Studio en fournit un, il suffit de vérif
 
 ## Étape 7 — Activer les autorisations dans l'application
 
-L'écran d'accueil (Onboarding) vous guide. Il faut activer **3 choses** :
+L'écran d'accueil (Onboarding) vous guide :
 
 1. **Service d'accessibilité** — *Paramètres → Accessibilité → Applications installées →
    « Drivee Copilote — Analyse d'offres » → Activer*.
    C'est ce qui permet de lire les offres Uber/Bolt à l'écran.
-2. **Affichage par-dessus les autres applications** (bulle flottante) — autorisez « Drivee Copilote ».
-3. **Notifications** — acceptez (nécessaire pour le service en arrière-plan).
+2. **Notifications** — bouton *Autoriser* du Tableau de bord (affiche « Drivee actif »).
+3. Vérifiez avec **Tableau de bord ▸ Tester la pop-up** : une offre d'exemple doit s'afficher en haut de l'écran.
 
 Conseillé : **désactiver l'optimisation de batterie** pour l'app (sinon Android peut la couper).
 
@@ -120,8 +120,8 @@ Conseillé : **désactiver l'optimisation de batterie** pour l'app (sinon Androi
 > allez dans *Paramètres → Applications → Drivee Copilote → ⋮ (menu en haut à droite) →
 > « Autoriser les paramètres restreints »*, puis réessayez. C'est normal pour une app installée hors Play Store.
 
-Ensuite : réglez votre **coût/km, commission, charges et objectif horaire** dans l'onglet *Réglages*,
-ouvrez Uber Driver ou Bolt Driver, et la bulle affichera la rentabilité de chaque offre.
+Ensuite : réglez vos **seuils rentables (€/km, €/h)** et vos coûts dans l'onglet *Réglages*,
+ouvrez Uber Driver, Bolt Driver ou Heetch Pro, et la pop-up affichera la rentabilité de chaque offre.
 
 ---
 
@@ -183,7 +183,7 @@ gradlew.bat test        # Windows
 | **Le téléphone n'apparaît pas** | Câble data, débogage USB activé, autorisation acceptée sur le téléphone, pilote USB (Windows). Débranchez/rebranchez. |
 | **« INSTALL_FAILED_UPDATE_INCOMPATIBLE »** | Désinstallez l'ancienne version de l'app du téléphone, puis relancez ▶. |
 | **L'accessibilité se désactive toute seule** | Désactivez l'optimisation de batterie pour l'app ; sur Xiaomi/Huawei/Samsung activez aussi « Démarrage automatique » / « Ne pas mettre en veille ». |
-| **La bulle ne détecte pas les offres** | Vérifiez que le service d'accessibilité est bien **activé** et que l'autorisation « superposition » est accordée. Les apps Uber/Bolt changent parfois leur interface : le parseur (`RideParser.kt`) peut nécessiter une mise à jour. |
+| **La pop-up n'apparaît pas** | Vérifiez sur le Tableau de bord que le service est **● Actif** et que *Tester la pop-up* fonctionne. Les apps Uber/Bolt/Heetch changent parfois leur interface : le parseur (`RideParser.kt`) peut nécessiter une mise à jour. |
 
 ---
 

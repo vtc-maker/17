@@ -9,7 +9,7 @@ import com.drivee.copilote.data.local.entity.VehicleSettingsEntity
 
 @Database(
     entities = [RideEntity::class, VehicleSettingsEntity::class],
-    version = 1,
+    version = 2, // v2 : seuils €/km + €/h (fallbackToDestructiveMigration)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

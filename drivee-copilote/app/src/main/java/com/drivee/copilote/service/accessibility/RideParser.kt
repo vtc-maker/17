@@ -29,7 +29,7 @@ class RideParser @Inject constructor() {
 
     companion object {
         private const val TAG = "RideParser"
-        private const val MAX_NODES = 800          // garde-fou perf
+        private const val MAX_NODES = 1500         // garde-fou perf
         private const val DEBUG_DUMP = false       // passer à true pour logger les textes
         private val NUMBER_REGEX = Regex("(\\d+(?:[.,]\\d{1,2})?)")
     }
@@ -40,16 +40,26 @@ class RideParser @Inject constructor() {
         val byViewId: MutableMap<String, String> = mutableMapOf()
     )
 
-    fun parse(root: AccessibilityNodeInfo?, pkg: String, config: ParserConfig): RideOffer? {
-        if (root == null) return null
+    fun parse(root: AccessibilityNodeInfo?, pkg: String, config: ParserConfig): RideOffer? =
+        if (root == null) null else parseRoots(listOf(root), pkg, config)
 
-        val harvest = try {
-            harvestTree(root)
-        } catch (t: Throwable) {
-            Log.w(TAG, "Échec du parcours de l'arbre", t)
-            return null
+    /**
+     * Analyse plusieurs fenêtres (la plus haute d'abord) : la carte d'offre est souvent
+     * une fenêtre séparée au-dessus de la carte. On tente chaque fenêtre seule
+     * (évite de mélanger avec "Gains du jour" de l'écran d'accueil), puis la fusion.
+     */
+    fun parseRoots(roots: List<AccessibilityNodeInfo>, pkg: String, config: ParserConfig): RideOffer? {
+        val harvests = roots.mapNotNull { root ->
+            runCatching { harvestTree(root) }
+                .onFailure { Log.w(TAG, "Échec du parcours de l'arbre", it) }
+                .getOrNull()
         }
-        return parseHarvest(harvest, pkg, config)
+        if (harvests.isEmpty()) return null
+        for (h in harvests) parseHarvest(h, pkg, config)?.let { return it }
+        if (harvests.size == 1) return null
+        val merged = Harvest()
+        harvests.forEach { merged.texts += it.texts; merged.byViewId.putAll(it.byViewId) }
+        return parseHarvest(merged, pkg, config)
     }
 
     /**
@@ -84,20 +94,12 @@ class RideParser @Inject constructor() {
         var rideKm = extractNumber(joined, rules.rideDistancePatterns)
         var rideMin = extractNumber(joined, rules.rideTimePatterns)
 
-        // 4) Repli heuristique si les libellés n'ont pas permis de distinguer.
-        //    - 2 valeurs ou plus : la plus petite = approche, la plus grande = course.
-        //    - 1 seule valeur : on la considère comme la course (certaines cartes Bolt
-        //      n'affichent qu'une distance/durée).
+        // 4) Repli heuristique sur toutes les valeurs "X km" / "X min" de l'écran :
+        //    la plus petite = approche, la plus grande = course ; complète les champs manquants.
         val kmFallback = allNumbersFollowedBy(joined, "km")
         val minFallback = allNumbersFollowedBy(joined, "min")
-        if (approachKm == null && rideKm == null && kmFallback.isNotEmpty()) {
-            if (kmFallback.size >= 2) approachKm = kmFallback.min()
-            rideKm = kmFallback.max()
-        }
-        if (approachMin == null && rideMin == null && minFallback.isNotEmpty()) {
-            if (minFallback.size >= 2) approachMin = minFallback.min()
-            rideMin = minFallback.max()
-        }
+        fillFromFallback(approachKm, rideKm, kmFallback).let { approachKm = it.first; rideKm = it.second }
+        fillFromFallback(approachMin, rideMin, minFallback).let { approachMin = it.first; rideMin = it.second }
 
         val pickup = extractString(joined, rules.pickupAddressPatterns)
         val destination = extractString(joined, rules.destinationAddressPatterns)
@@ -182,6 +184,21 @@ class RideParser @Inject constructor() {
         if (rules.offerAnchorPatterns.isEmpty()) return true
         return rules.offerAnchorPatterns.any { p ->
             runCatching { Regex(p).containsMatchIn(text) }.getOrDefault(false)
+        }
+    }
+
+    /**
+     * Complète (approche, course) à partir des valeurs trouvées sans libellé.
+     *  - rien de connu : 1 valeur = course ; 2+ valeurs = min approche / max course.
+     *  - un seul connu : l'autre = la plus grande (course) / plus petite (approche) restante.
+     */
+    private fun fillFromFallback(approach: Double?, ride: Double?, values: List<Double>): Pair<Double?, Double?> {
+        if (values.isEmpty() || (approach != null && ride != null)) return approach to ride
+        return when {
+            approach == null && ride == null ->
+                if (values.size >= 2) values.min() to values.max() else null to values.first()
+            ride == null -> approach to values.filter { it != approach }.maxOrNull()
+            else -> values.filter { it < ride }.minOrNull() to ride
         }
     }
 

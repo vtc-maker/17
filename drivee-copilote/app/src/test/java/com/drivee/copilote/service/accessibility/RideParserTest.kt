@@ -103,4 +103,45 @@ class RideParserTest {
         assertEquals(6.3, offer.totalDistanceKm!!, 0.001)
         assertEquals(14.0, offer.totalTimeMin!!, 0.001)
     }
+
+    @Test
+    fun `format Uber FR - libelle avant la valeur et km entre parentheses`() {
+        val texts = listOf(
+            "UberX",
+            "12,40 €",
+            "4 min (1,2 km) de distance",
+            "Trajet de 18 min (9,4 km)",
+            "Appuyez pour accepter"
+        )
+
+        val offer = parser.parseTexts(texts, "com.ubercab.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(12.4, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(1.2, offer.approachDistanceKm!!, 0.001)
+        assertEquals(4.0, offer.approachTimeMin!!, 0.001)
+        assertEquals(9.4, offer.rideDistanceKm!!, 0.001)
+        assertEquals(18.0, offer.rideTimeMin!!, 0.001)
+    }
+
+    @Test
+    fun `offre Heetch reconnue`() {
+        val texts = listOf("Nouvelle course", "14,00 €", "6 min · 3 km", "20 min · 12 km", "Accepter")
+
+        val offer = parser.parseTexts(texts, "com.heetch.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(14.0, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(15.0, offer.totalDistanceKm!!, 0.001)
+        assertEquals(26.0, offer.totalTimeMin!!, 0.001)
+    }
+
+    @Test
+    fun `km sans espace accepte`() {
+        val offer = parser.parseTexts(listOf("Accepter", "9,80€", "7,4km", "15min"), "ee.mtakso.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(7.4, offer!!.totalDistanceKm!!, 0.001)
+        assertEquals(15.0, offer.totalTimeMin!!, 0.001)
+    }
 }

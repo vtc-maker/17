@@ -14,18 +14,17 @@ data class VehicleSettings(
     /** Cotisations sociales / charges d'entreprise (% du chiffre d'affaires encaissé). */
     val socialChargesPercent: Double = 22.0,
 
-    /** Objectif de revenu horaire NET (€/h) — pilote le score couleur. */
-    val hourlyNetTargetEuros: Double = 15.0,
-
     /**
-     * Seuils de score sur le NET horaire (€/h), configurables :
-     *  - >= [greenThresholdHourlyEuros]  -> VERT
-     *  - >= [orangeThresholdHourlyEuros] -> ORANGE
-     *  - sinon                           -> ROUGE
-     * Par défaut : vert = objectif, orange = 70 % de l'objectif.
+     * Seuils "rentables" de la pop-up (calculés sur le PRIX AFFICHÉ, approche incluse) :
+     *  - €/km = prix ÷ km totaux
+     *  - €/h  = prix ÷ minutes totales × 60
+     * La note retenue est la PLUS MAUVAISE des deux.
      */
-    val greenThresholdHourlyEuros: Double = 15.0,
-    val orangeThresholdHourlyEuros: Double = 10.5,
+    val perKmThresholdEuros: Double = 1.0,
+    val hourlyThresholdEuros: Double = 30.0,
+
+    /** Zone MOYEN : à partir de ce pourcentage du seuil (en dessous = MAUVAIS). */
+    val mediumThresholdPercent: Double = 80.0,
 
     /** Le prix affiché par la plateforme est-il déjà NET (commission déduite) ? */
     val priceIsNetOfCommission: Boolean = true

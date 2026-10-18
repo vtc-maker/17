@@ -36,9 +36,9 @@ class SettingsRepository @Inject constructor(
         costPerKmEuros = costPerKmEuros,
         platformCommissionPercent = platformCommissionPercent,
         socialChargesPercent = socialChargesPercent,
-        hourlyNetTargetEuros = hourlyNetTargetEuros,
-        greenThresholdHourlyEuros = greenThresholdHourlyEuros,
-        orangeThresholdHourlyEuros = orangeThresholdHourlyEuros,
+        perKmThresholdEuros = perKmThresholdEuros,
+        hourlyThresholdEuros = hourlyThresholdEuros,
+        mediumThresholdPercent = mediumThresholdPercent,
         priceIsNetOfCommission = priceIsNetOfCommission
     )
 
@@ -47,9 +47,9 @@ class SettingsRepository @Inject constructor(
         costPerKmEuros = costPerKmEuros,
         platformCommissionPercent = platformCommissionPercent,
         socialChargesPercent = socialChargesPercent,
-        hourlyNetTargetEuros = hourlyNetTargetEuros,
-        greenThresholdHourlyEuros = greenThresholdHourlyEuros,
-        orangeThresholdHourlyEuros = orangeThresholdHourlyEuros,
+        perKmThresholdEuros = perKmThresholdEuros,
+        hourlyThresholdEuros = hourlyThresholdEuros,
+        mediumThresholdPercent = mediumThresholdPercent,
         priceIsNetOfCommission = priceIsNetOfCommission
     )
 }

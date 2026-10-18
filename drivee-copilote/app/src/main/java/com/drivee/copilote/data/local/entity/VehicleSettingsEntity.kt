@@ -13,8 +13,8 @@ data class VehicleSettingsEntity(
     val costPerKmEuros: Double = 0.25,
     val platformCommissionPercent: Double = 0.0,
     val socialChargesPercent: Double = 22.0,
-    val hourlyNetTargetEuros: Double = 15.0,
-    val greenThresholdHourlyEuros: Double = 15.0,
-    val orangeThresholdHourlyEuros: Double = 10.5,
+    val perKmThresholdEuros: Double = 1.0,
+    val hourlyThresholdEuros: Double = 30.0,
+    val mediumThresholdPercent: Double = 80.0,
     val priceIsNetOfCommission: Boolean = true
 )

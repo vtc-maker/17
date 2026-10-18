@@ -6,21 +6,15 @@
     <!--  PERMISSIONS                                                  -->
     <!-- ============================================================= -->
 
-    <!-- Vignette flottante par-dessus les autres applications -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
-    <!-- Foreground service pour maintenir l'overlay actif (API 28+) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Type explicite requis à partir d'Android 14 (API 34) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-
-    <!-- Notification du foreground service (Android 13+) -->
+    <!-- Notification "Drivee actif" (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Demander l'exclusion de l'optimisation batterie (Doze) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
+      La pop-up est affichée par le service d'accessibilité (TYPE_ACCESSIBILITY_OVERLAY) :
+      ni SYSTEM_ALERT_WINDOW ni foreground service ne sont nécessaires.
       L'accès à l'AccessibilityService n'exige PAS de <uses-permission> côté app :
       c'est le SERVICE qui se protège via android:permission="BIND_ACCESSIBILITY_SERVICE"
       (voir plus bas). L'utilisateur active le service manuellement dans les Réglages.
@@ -66,20 +60,6 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <!-- ========================================================= -->
-        <!--  SERVICE OVERLAY (foreground) — vignette flottante        -->
-        <!--  foregroundServiceType="specialUse" requis Android 14+.   -->
-        <!-- ========================================================= -->
-        <service
-            android:name=".service.overlay.OverlayService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <!-- Justification requise à partir d'Android 14 pour specialUse -->
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Affichage d'une vignette d'aide à la conduite (rentabilité) par-dessus l'application VTC active." />
         </service>
 
         <!-- ========================================================= -->

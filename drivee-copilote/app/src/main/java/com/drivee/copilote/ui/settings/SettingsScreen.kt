@@ -43,9 +43,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     var costPerKm by remember { mutableStateOf("") }
     var commission by remember { mutableStateOf("") }
     var charges by remember { mutableStateOf("") }
-    var target by remember { mutableStateOf("") }
-    var green by remember { mutableStateOf("") }
-    var orange by remember { mutableStateOf("") }
+    var perKmThreshold by remember { mutableStateOf("") }
+    var hourlyThreshold by remember { mutableStateOf("") }
+    var mediumPercent by remember { mutableStateOf("") }
     var priceIsNet by remember { mutableStateOf(true) }
     var savedAt by remember { mutableStateOf(0L) }
 
@@ -59,9 +59,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         costPerKm = settings.costPerKmEuros.frText()
         commission = settings.platformCommissionPercent.frText()
         charges = settings.socialChargesPercent.frText()
-        target = settings.hourlyNetTargetEuros.frText()
-        green = settings.greenThresholdHourlyEuros.frText()
-        orange = settings.orangeThresholdHourlyEuros.frText()
+        perKmThreshold = settings.perKmThresholdEuros.frText()
+        hourlyThreshold = settings.hourlyThresholdEuros.frText()
+        mediumPercent = settings.mediumThresholdPercent.frText()
         priceIsNet = settings.priceIsNetOfCommission
     }
 
@@ -79,20 +79,31 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         )
         Spacer(Modifier.height(16.dp))
 
-        NumberField("Coût au kilomètre (€/km)", costPerKm) { costPerKm = it }
-        NumberField("Commission plateforme (%)", commission) { commission = it }
-        NumberField("Charges sociales (%)", charges) { charges = it }
-        NumberField("Objectif horaire net (€/h)", target) { target = it }
-
-        Spacer(Modifier.height(8.dp))
         Text(
-            "Seuils du score couleur (sur le net €/h)",
+            "Seuil rentable de la pop-up",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "Calculé sur le prix affiché, approche incluse. La note retenue est la plus mauvaise des deux : SUPER au-dessus du seuil, MOYEN dans la zone, MAUVAIS en dessous.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        NumberField("Seuil rentable (€/km)", perKmThreshold) { perKmThreshold = it }
+        NumberField("Seuil rentable (€/h)", hourlyThreshold) { hourlyThreshold = it }
+        NumberField("Zone MOYEN à partir de (% du seuil)", mediumPercent) { mediumPercent = it }
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Bénéfice net (historique & statistiques)",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(8.dp))
-        NumberField("Seuil VERT ≥ (€/h)", green) { green = it }
-        NumberField("Seuil ORANGE ≥ (€/h)", orange) { orange = it }
+        NumberField("Coût au kilomètre (€/km)", costPerKm) { costPerKm = it }
+        NumberField("Commission plateforme (%)", commission) { commission = it }
+        NumberField("Charges sociales (%)", charges) { charges = it }
 
         Spacer(Modifier.height(8.dp))
         Row(
@@ -122,9 +133,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         costPerKmEuros = costPerKm.frDouble(0.25),
                         platformCommissionPercent = commission.frDouble(0.0),
                         socialChargesPercent = charges.frDouble(22.0),
-                        hourlyNetTargetEuros = target.frDouble(15.0),
-                        greenThresholdHourlyEuros = green.frDouble(15.0),
-                        orangeThresholdHourlyEuros = orange.frDouble(10.5),
+                        perKmThresholdEuros = perKmThreshold.frDouble(1.0),
+                        hourlyThresholdEuros = hourlyThreshold.frDouble(30.0),
+                        mediumThresholdPercent = mediumPercent.frDouble(80.0),
                         priceIsNetOfCommission = priceIsNet
                     )
                 )

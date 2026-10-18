@@ -10,20 +10,18 @@ import javax.inject.Singleton
 /**
  * ⭐ MOTEUR DE RENTABILITÉ — logique métier PURE (aucune dépendance Android).
  *
- * Prend en entrée les [VehicleSettings] du chauffeur et une [RideOffer] extraite
- * de l'écran, renvoie un objet [ProfitabilityMetrics] prêt à afficher.
+ * Affichage pop-up (sur le prix affiché, approche + course incluses) :
+ *   €/km = prix / distanceTotaleKm
+ *   €/h  = prix / (dureeTotaleMin / 60)
  *
- * Modèle de calcul :
- *   revenuEncaisse   = prixBrut * (1 - commission%)      (si le prix est brut)
- *   charges          = revenuEncaisse * chargesSociales%
- *   coutVehicule     = distanceTotaleKm * coutParKm
- *   beneficeNet      = revenuEncaisse - charges - coutVehicule
+ * Verdict : ratio = min(€/km ÷ seuil €/km , €/h ÷ seuil €/h)
+ *   ratio ≥ 1                → SUPER   (GREEN)
+ *   ratio ≥ zone MOYEN (80%) → MOYEN   (ORANGE)
+ *   sinon                    → MAUVAIS (RED)
  *
- *   €/h brut = prixBrut       / (dureeTotaleMin / 60)
- *   €/h net  = beneficeNet    / (dureeTotaleMin / 60)
- *   €/km     = montant        / distanceTotaleKm   (approche + course incluses)
- *
- * Toutes les divisions sont protégées contre le zéro / null.
+ * Historique (bénéfice réel) :
+ *   encaissé = prix × (1 − commission%) ; charges = encaissé × charges% ;
+ *   coût véhicule = km × coût/km ; net = encaissé − charges − coût véhicule.
  */
 @Singleton
 class ProfitabilityEngine @Inject constructor() {
@@ -33,7 +31,6 @@ class ProfitabilityEngine @Inject constructor() {
         val totalKm = offer.totalDistanceKm
         val totalMin = offer.totalTimeMin
 
-        // Sans prix, aucune métrique n'est calculable.
         if (gross == null || gross <= 0.0) {
             return ProfitabilityMetrics(
                 grossHourlyRateEuros = null,
@@ -47,33 +44,23 @@ class ProfitabilityEngine @Inject constructor() {
             )
         }
 
-        // 1) Revenu réellement encaissé (déduction commission si prix brut).
         val commissionFactor =
             if (settings.priceIsNetOfCommission) 1.0
             else (1.0 - settings.platformCommissionPercent.coerceIn(0.0, 100.0) / 100.0)
         val collectedRevenue = gross * commissionFactor
-
-        // 2) Charges sociales sur le revenu encaissé.
         val socialCharges = collectedRevenue * settings.socialChargesPercent.coerceAtLeast(0.0) / 100.0
-
-        // 3) Coût véhicule sur la distance totale (approche + course).
         val vehicleCost = (totalKm ?: 0.0) * settings.costPerKmEuros.coerceAtLeast(0.0)
-
-        // 4) Bénéfice net.
         val netProfit = collectedRevenue - socialCharges - vehicleCost
 
-        // 5) Taux horaires (protégés).
         val hours = totalMin?.takeIf { it > 0.0 }?.div(60.0)
         val grossHourly = hours?.let { gross / it }
         val netHourly = hours?.let { netProfit / it }
 
-        // 6) Tarifs au kilomètre (protégés).
         val km = totalKm?.takeIf { it > 0.0 }
         val grossPerKm = km?.let { gross / it }
         val netPerKm = km?.let { netProfit / it }
 
-        // 7) Score couleur, basé sur le NET horaire vs seuils configurés.
-        val score = scoreFrom(netHourly, settings)
+        val ratio = thresholdRatio(grossPerKm, grossHourly, settings)
 
         return ProfitabilityMetrics(
             grossHourlyRateEuros = grossHourly?.round2(),
@@ -83,15 +70,24 @@ class ProfitabilityEngine @Inject constructor() {
             netProfitEuros = netProfit.round2(),
             totalDistanceKm = totalKm?.round2(),
             totalTimeMin = totalMin?.round2(),
-            score = score
+            score = scoreFrom(ratio, settings),
+            thresholdRatio = ratio
         )
     }
 
-    private fun scoreFrom(netHourly: Double?, s: VehicleSettings): ProfitabilityScore {
-        if (netHourly == null) return ProfitabilityScore.UNKNOWN
+    /** Le plus mauvais des deux ratios disponibles (€/km et €/h). */
+    private fun thresholdRatio(perKm: Double?, hourly: Double?, s: VehicleSettings): Double? {
+        val kmRatio = perKm?.let { v -> s.perKmThresholdEuros.takeIf { it > 0.0 }?.let { v / it } }
+        val hRatio = hourly?.let { v -> s.hourlyThresholdEuros.takeIf { it > 0.0 }?.let { v / it } }
+        return listOfNotNull(kmRatio, hRatio).minOrNull()
+    }
+
+    private fun scoreFrom(ratio: Double?, s: VehicleSettings): ProfitabilityScore {
+        if (ratio == null) return ProfitabilityScore.UNKNOWN
+        val medium = s.mediumThresholdPercent.coerceIn(0.0, 100.0) / 100.0
         return when {
-            netHourly >= s.greenThresholdHourlyEuros -> ProfitabilityScore.GREEN
-            netHourly >= s.orangeThresholdHourlyEuros -> ProfitabilityScore.ORANGE
+            ratio >= 1.0 -> ProfitabilityScore.GREEN
+            ratio >= medium -> ProfitabilityScore.ORANGE
             else -> ProfitabilityScore.RED
         }
     }

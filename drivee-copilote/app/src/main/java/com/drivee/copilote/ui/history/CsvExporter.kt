@@ -94,13 +94,14 @@ object CsvExporter {
     private fun platformLabel(pkg: String): String = when (pkg) {
         "com.ubercab.driver" -> "Uber"
         "ee.mtakso.driver" -> "Bolt"
+        "com.heetch.driver" -> "Heetch"
         else -> pkg
     }
 
     private fun scoreLabel(score: String): String = when (score) {
-        "GREEN" -> "Vert"
-        "ORANGE" -> "Orange"
-        "RED" -> "Rouge"
+        "GREEN" -> "Super"
+        "ORANGE" -> "Moyen"
+        "RED" -> "Mauvais"
         else -> "Inconnu"
     }
 }

@@ -84,3 +84,5 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - Non vérifiable ici : build Gradle Android complet (SDK absent), comportement a11y/overlay sur appareil.
 
 - 2026-10-18: Ajout BUILD_ANDROID_STUDIO_DEBUTANT.md (guide build Android Studio débutant), lien depuis README §3.
+
+- 2026-10-18: Refonte pop-up (style Drivee: plateforme · €/km · prix · €/h · min·km · jauge SUPER/MOYEN/MAUVAIS + seuil rentable), affichée par le service d'accessibilité (TYPE_ACCESSIBILITY_OVERLAY, plus de FGS/SYSTEM_ALERT_WINDOW), notification 'Drivee actif' au connect, Heetch ajouté, verdict = pire de €/km (seuil 1€) et €/h (seuil 30€), zone MOYEN 80%, bouton Tester la pop-up. DB v2.

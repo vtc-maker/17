@@ -1,10 +1,10 @@
 # Drivee Copilote 🚕
 
-**Assistant de rentabilité pour chauffeurs VTC (Uber / Bolt) — Android natif, Kotlin.**
+**Assistant de rentabilité pour chauffeurs VTC (Uber / Bolt / Heetch) — Android natif, Kotlin.**
 
-Drivee Copilote lit les offres de course affichées par l'application Uber Driver ou Bolt Driver,
-calcule instantanément leur rentabilité (€/km, €/h nets, bénéfice) et affiche une **vignette
-flottante** colorée (🟢 / 🟠 / 🔴) par-dessus l'app du chauffeur. Toutes les courses analysées
+Drivee Copilote lit les offres de course affichées par Uber Driver, Bolt Driver ou Heetch Pro,
+calcule instantanément leur rentabilité (€/km, €/h) et affiche une **pop-up** en haut de l'écran
+avec un verdict **SUPER / MOYEN / MAUVAIS** et une jauge « seuil rentable ». Toutes les courses analysées
 sont historisées **localement** (aucun serveur, aucune donnée envoyée) pour produire des
 statistiques, un export CSV comptable et un récap hebdomadaire partageable.
 
@@ -35,14 +35,14 @@ statistiques, un export CSV comptable et un récap hebdomadaire partageable.
 | Écran / Service | Ce que ça fait |
 |---|---|
 | **Onboarding** | Écran d'accueil affichant la divulgation exigée par Google avant toute activation de l'accessibilité. |
-| **Tableau de bord** | État des 3 permissions (Accessibilité, Overlay, Batterie) avec boutons d'activation et rappel de la divulgation. |
-| **Service d'accessibilité** | Écoute `com.ubercab.driver` et `ee.mtakso.driver`, lit les textes de la carte d'offre, extrait prix / distances / durées / adresses. |
-| **Moteur de rentabilité** | Calcule €/km brut & net, €/h brut & net, bénéfice net, et attribue un score 🟢🟠🔴 selon VOS seuils. |
-| **Vignette flottante** | Carte compacte par-dessus Uber/Bolt : €/h net, €/km net, pastille couleur, bouton ✕. Disparaît automatiquement après 20 s ou quand l'offre disparaît. |
+| **Tableau de bord** | État du service (réellement actif ou non), Notifications, Batterie, et bouton **Tester la pop-up**. |
+| **Service d'accessibilité** | Tourne en permanence en arrière-plan, écoute `com.ubercab.driver`, `ee.mtakso.driver` et `com.heetch.driver`, parcourt toutes leurs fenêtres, lit les textes de la carte d'offre, extrait prix / distances / durées / adresses. |
+| **Moteur de rentabilité** | €/km = prix ÷ km, €/h = prix ÷ min × 60 (approche incluse). Verdict = le pire des deux face à VOS seuils. Bénéfice net calculé pour l'historique. |
+| **Pop-up d'offre** | `PLATEFORME  €/km   PRIX   €/h`, « min · km », jauge colorée avec repère *seuil rentable*. En haut de l'écran, déplaçable, un appui la ferme, disparaît avec l'offre (max 30 s). Affichée par le service d'accessibilité (`TYPE_ACCESSIBILITY_OVERLAY`) : aucune permission « superposition » requise. |
 | **Historique** | Liste de toutes les offres analysées (filtres Aujourd'hui / 7 jours / Tout), suppression, **export CSV** compatible Excel français (`;` et virgule décimale). |
 | **Statistiques** | Graphiques du revenu net **par jour** (semaine en cours) et **par semaine** (6 dernières), nombre de courses, €/h moyen. |
 | **Récap partageable** | Résumé hebdomadaire texte + CSV joint, prêt à envoyer au comptable en un tap (WhatsApp, Mail…). |
-| **Réglages** | Coût/km, commission plateforme %, charges sociales %, objectif €/h, seuils de couleur, prix affiché net/brut de commission. |
+| **Réglages** | Coût/km, commission plateforme %, charges sociales %, seuil rentable €/km et €/h, zone MOYEN (%), prix affiché net/brut de commission. |
 
 ---
 
@@ -169,16 +169,16 @@ ou copier l'APK sur le téléphone et l'ouvrir (autoriser *Installer des applica
 
 ## 4. Guide d'utilisation
 
-### 4.1 Premier lancement — les 3 permissions
+### 4.1 Premier lancement — activer le service
 
 Au premier démarrage, l'écran **Bienvenue** explique pourquoi l'app a besoin du service d'accessibilité
 (c'est la *divulgation* imposée par Google). Appuyez sur **J'ai compris, activer** → vous arrivez sur le
-**Tableau de bord** qui liste 3 permissions :
+**Tableau de bord** :
 
 | Permission | Obligatoire ? | Comment l'activer |
 |---|---|---|
 | **Service d'accessibilité** | ✅ Oui | Bouton *Activer* → confirmer la divulgation → Android ouvre *Paramètres ▸ Accessibilité* → trouver **Drivee Copilote — Analyse d'offres** → activer → *Autoriser*. |
-| **Affichage par-dessus les autres apps** | ✅ Oui | Bouton *Activer* → Android ouvre la page de l'app → activer l'interrupteur. |
+| **Notifications** | Recommandé | Bouton *Autoriser* → affiche la notification *Drivee actif* tant que le service tourne. |
 | **Optimisation de la batterie** | Recommandé | Bouton *Configurer* → choisir *Ne pas optimiser* / *Autoriser*. Évite qu'Android coupe l'analyse en arrière-plan. |
 
 Revenez dans Drivee : les cartes passent au **vert "Activé"** automatiquement.
@@ -195,32 +195,34 @@ C'est l'étape la plus importante : la rentabilité affichée dépend de vos chi
 | **Coût par km (€)** | Carburant + usure + assurance + entretien ramenés au km. Calcul : *(dépenses annuelles véhicule) ÷ (km annuels)*. | `0,25` |
 | **Commission plateforme (%)** | Part prélevée par Uber/Bolt sur le prix affiché. | `25` |
 | **Charges sociales (%)** | Cotisations URSSAF (micro-entrepreneur ≈ 21–22 %), impôts… appliquées sur le CA après commission. | `22` |
-| **Objectif net (€/h)** | Ce que vous voulez gagner **net** par heure. Sert de référence pour le score. | `20` |
-| **Seuil vert (€/h)** | Au-dessus → 🟢 *Rentable*. | `20` |
-| **Seuil orange (€/h)** | Entre orange et vert → 🟠 *Moyen*. En dessous → 🔴 *À éviter*. | `14` |
+| **Seuil rentable (€/km)** | Repère « seuil rentable » de la jauge pour le €/km. | `1,00` |
+| **Seuil rentable (€/h)** | Idem pour le €/h. | `30` |
+| **Zone MOYEN à partir de (%)** | Entre ce % du seuil et le seuil → 🟠 MOYEN ; en dessous → 🔴 MAUVAIS ; au-dessus du seuil → 🟢 SUPER. | `80` |
 | **Prix affiché déjà net de commission** | Cochez si l'app vous montre ce que **vous** touchez (cas d'Uber en France depuis 2023). Décochez si c'est le prix payé par le client. | ☑ |
 
 Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confirme.
 
-### 4.3 En service — la vignette flottante
+### 4.3 En service — la pop-up
 
-1. Lancez **Uber Driver** ou **Bolt Driver** normalement et passez en ligne.
-2. Une notification discrète *Drivee actif — Analyse des offres en cours…* apparaît : c'est normal, elle maintient le service en vie.
-3. Quand une **offre de course** s'affiche, la vignette Drivee apparaît en haut de l'écran :
+1. Dès que le service d'accessibilité est activé, la notification *Drivee actif — Analyse des offres en cours…* apparaît (si les notifications sont autorisées).
+2. Vérifiez l'affichage avec **Tableau de bord ▸ Tester la pop-up ▸ Afficher un exemple**.
+3. Lancez **Uber Driver**, **Bolt Driver** ou **Heetch Pro** et passez en ligne. À chaque **offre de course**, la pop-up apparaît en haut de l'écran :
 
 ```
- ┌───────────────────────────────┐
- │ ● 18,4 €/h net   1,12 €/km  ✕ │
- │   Rentable                     │
- └───────────────────────────────┘
+ ┌──────────────────────────────────────────────┐
+ │ UBER 1.78€/km        16€         74€/h        │
+ │                13 min · 9 km                  │
+ │                                   SUPER       │
+ │ ━━━━━━━━━━━━━━━━━━━━━━━|━━━━━━━━━━●           │
+ │                  seuil rentable               │
+ └──────────────────────────────────────────────┘
 ```
 
-- 🟢 **Rentable** : €/h net ≥ seuil vert
-- 🟠 **Moyen** : entre les deux seuils
-- 🔴 **À éviter** : €/h net < seuil orange
-- ⚪ **Données insuffisantes** : prix ou distance non lus (interface inconnue)
+- 🟢 **SUPER** : €/km ET €/h au-dessus de leurs seuils
+- 🟠 **MOYEN** : le plus faible des deux entre 80 % et 100 % du seuil
+- 🔴 **MAUVAIS** : le plus faible des deux sous 80 % du seuil
 
-4. La vignette disparaît toute seule après **20 s**, quand l'offre quitte l'écran, ou en appuyant sur **✕**.
+4. La pop-up disparaît quand l'offre quitte l'écran (ou après 30 s), ou d'un simple **appui**. **Glissez-la** pour la déplacer.
 5. La course analysée est **enregistrée dans l'Historique** quelle que soit votre décision (accepter ou non).
 
 ### 4.4 Historique 📋
@@ -241,7 +243,7 @@ Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confir
 
 ### 4.6 Arrêter l'analyse
 
-Désactivez le service dans *Paramètres ▸ Accessibilité ▸ Drivee Copilote*. La notification et la vignette
+Désactivez le service dans *Paramètres ▸ Accessibilité ▸ Drivee Copilote*. La notification et la pop-up
 disparaissent immédiatement. Vos données restent dans l'Historique.
 
 ---
@@ -260,19 +262,22 @@ Après charges     = Après commission × (1 − charges %)
 Coût véhicule     = Distance totale × coût/km
 Bénéfice net      = Après charges − Coût véhicule
 
-€/km brut         = Prix brut ÷ Distance totale
-€/km net          = Bénéfice net ÷ Distance totale
-€/h brut          = Prix brut ÷ Temps total
-€/h net           = Bénéfice net ÷ Temps total
+POP-UP
+€/km              = Prix ÷ Distance totale
+€/h               = Prix ÷ Temps total
+Ratio             = min( €/km ÷ seuil €/km , €/h ÷ seuil €/h )
+Verdict           = SUPER si ratio ≥ 1 · MOYEN si ratio ≥ 80 % · MAUVAIS sinon
+Jauge             = point placé à ratio × 60 % de la barre (le repère « seuil rentable » est à 60 %)
 
-Score             = 🟢 si €/h net ≥ seuil vert
-                    🟠 si €/h net ≥ seuil orange
-                    🔴 sinon
-                    ⚪ si prix OU (distance ET temps) manquants
+HISTORIQUE
+€/km net          = Bénéfice net ÷ Distance totale
+€/h net           = Bénéfice net ÷ Temps total
 ```
 
-**Exemple** — prix 14,50 € (déjà net de commission), 4,2 km + 12,8 km, 9 + 22 min, coût 0,25 €/km, charges 22 % :
-après charges 11,31 € − coût 4,25 € = **7,06 € net** → 17 km → **0,42 €/km net** ; 31 min → **13,7 €/h net** → 🔴 avec seuil orange 14.
+**Exemples** (seuils 1,00 €/km et 30 €/h) :
+- Uber 16 € · 9 km · 13 min → 1,78 €/km · 74 €/h → **SUPER**
+- Heetch 14 € · 15 km · 26 min → 0,93 €/km · 32 €/h → **MOYEN** (le €/km est sous le seuil)
+- Bolt 10 € · 14 km · 24 min → 0,71 €/km · 25 €/h → **MAUVAIS**
 
 ---
 
@@ -324,7 +329,7 @@ app/src/main/java/com/drivee/copilote/
 ├── service/
 │   ├── accessibility/RideAccessibilityService.kt   Écoute Uber/Bolt, parse, calcule, déclenche l'overlay, historise
 │   ├── accessibility/RideParser.kt                 Parcours d'arbre + extraction regex (parseTexts() testable)
-│   └── overlay/OverlayService.kt                   Foreground service + WindowManager (vignette)
+│   └── overlay/OfferOverlay.kt, GaugeView.kt       Pop-up (TYPE_ACCESSIBILITY_OVERLAY) + jauge
 └── ui/
     ├── MainActivity.kt, navigation/DriveeNavHost.kt (barre d'onglets)
     ├── theme/                          Palette sombre "cockpit"
@@ -334,13 +339,13 @@ app/src/main/java/com/drivee/copilote/
 res/
 ├── xml/accessibility_service_config.xml   packageNames restreints, flags, timeout 100 ms
 ├── xml/file_paths.xml                     FileProvider (cache/exports)
-├── layout/overlay_view.xml                Vignette flottante
+├── font/jetbrains_mono_medium.ttf         Police des chiffres de la pop-up
 └── mipmap-anydpi-v26/                     Icône adaptative
 ```
 
 **Flux de données en service :**
 `Uber/Bolt` → événement accessibilité → `RideParser` → `RideOffer` → `ProfitabilityEngine` → `ProfitabilityMetrics`
-→ `OverlayService.show()` **et** `RideRepository.save()` → Historique / Stats (Flow Room, mise à jour en direct).
+→ `OfferOverlay.show()` **et** `RideRepository.save()` → Historique / Stats (Flow Room, mise à jour en direct).
 
 Versions clés : Kotlin 1.9.22 · AGP 8.2.2 · Compose BOM 2024.02.00 · Hilt 2.50 · Room 2.6.1 · minSdk 26 · targetSdk 34.
 
@@ -366,12 +371,12 @@ ou clic droit sur `app/src/test` ▸ **Run Tests**.
 
 Le service d'accessibilité et l'overlay ne peuvent être validés que sur un téléphone réel :
 
-1. Activer les 3 permissions, vérifier que les cartes passent au vert.
-2. Ouvrir Uber/Bolt, attendre une offre → la vignette doit apparaître en < 1 s.
+1. Activer le service, puis *Tester la pop-up* : les 3 exemples SUPER / MOYEN / MAUVAIS doivent s'afficher.
+2. Ouvrir Uber/Bolt, attendre une offre → la pop-up doit apparaître en < 1 s.
 3. Vérifier les valeurs lues vs l'écran (activer `DEBUG_DUMP` si écart).
 4. Vérifier la disparition (✕, 20 s, offre expirée).
 5. Vérifier l'Historique, l'export CSV, les Stats, le récap partagé.
-6. Désactiver l'accessibilité → notification et vignette doivent disparaître.
+6. Désactiver l'accessibilité → notification et pop-up doivent disparaître.
 7. Tester après redémarrage du téléphone et après 30 min d'écran éteint (batterie).
 
 ---
@@ -389,8 +394,8 @@ L'usage de l'API d'accessibilité pour une app qui n'est pas destinée aux perso
 
 Dans la **Play Console** :
 1. *Contenu de l'application ▸ API d'accessibilité* : déclarer l'usage, justifier par la **sécurité routière**
-   (le chauffeur n'a plus à calculer mentalement en conduisant) et joindre une **vidéo** montrant le flux divulgation → activation → vignette.
-2. *Autorisations sensibles* : justifier `SYSTEM_ALERT_WINDOW` (affichage de l'indicateur pendant la conduite) et `FOREGROUND_SERVICE_SPECIAL_USE`.
+   (le chauffeur n'a plus à calculer mentalement en conduisant) et joindre une **vidéo** montrant le flux divulgation → activation → pop-up.
+2. *Autorisations sensibles* : seule l'API d'accessibilité est à justifier (plus de `SYSTEM_ALERT_WINDOW` ni de foreground service).
 3. Renseigner l'URL de la politique de confidentialité.
 4. Section *Sécurité des données* : « Aucune donnée collectée ni partagée » (tout est local).
 
@@ -404,7 +409,7 @@ Dans la **Play Console** :
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | La carte *Accessibilité* reste rouge après activation | Le système n'a pas encore rafraîchi | Quitter et rouvrir Drivee (l'état est relu au retour à l'écran). |
-| Aucune vignette lors d'une offre | Permission overlay manquante / interface Uber-Bolt modifiée | Vérifier le Dashboard ; sinon activer `DEBUG_DUMP` et ajuster les regex (§6). |
+| Aucune pop-up lors d'une offre | Service coché mais pas actif (voir Tableau de bord) / interface de l'app VTC modifiée | Vérifier le Dashboard ; sinon activer `DEBUG_DUMP` et ajuster les regex (§6). |
 | Vignette *Données insuffisantes* ⚪ | Prix ou distance non reconnus | Idem : regarder Logcat `RideParser`, ajuster `pricePatterns` / `*DistancePatterns`. |
 | Service coupé après quelques minutes | Optimisation batterie / constructeur agressif | Exclure l'app de l'optimisation + autoriser le démarrage auto (Xiaomi/Huawei/Oppo). |
 | Fausses courses dans l'Historique | Une ancre trop générique | Resserrer `offerAnchorPatterns` (ne jamais remettre `€` seul). |
@@ -412,7 +417,7 @@ Dans la **Play Console** :
 | Build : `android.useAndroidX` manquant | `gradle.properties` absent | Il est fourni à la racine ; vérifier qu'il n'a pas été supprimé. |
 | Export CSV : « Aucune application » | Aucune app de partage installée | Installer Gmail/Drive ou un gestionnaire de fichiers. |
 
-Logs utiles (Logcat) : `RideA11yService`, `RideParser`, `OverlayService`.
+Logs utiles (Logcat) : `RideA11yService`, `RideParser`, `OfferOverlay`.
 
 ---
 
@@ -422,7 +427,6 @@ Logs utiles (Logcat) : `RideA11yService`, `RideParser`, `OverlayService`.
 - Les adresses complètes ne sont lues que si l'app les affiche sous forme de texte accessible.
 - Le temps d'attente avant la course (hors trajet) n'est pas estimé.
 - Pas de synchronisation cloud : une désinstallation efface l'historique → exportez régulièrement en CSV.
-- La vignette n'est pas déplaçable au doigt (position fixe en haut).
 
 ---
 

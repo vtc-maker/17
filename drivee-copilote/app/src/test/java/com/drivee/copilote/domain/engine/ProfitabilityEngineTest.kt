@@ -16,13 +16,11 @@ class ProfitabilityEngineTest {
     private val engine = ProfitabilityEngine()
 
     @Test
-    fun `course rentable classee VERT`() {
+    fun `course rentable classee SUPER`() {
         val settings = VehicleSettings(
             costPerKmEuros = 0.20,
             platformCommissionPercent = 0.0,
             socialChargesPercent = 22.0,
-            greenThresholdHourlyEuros = 15.0,
-            orangeThresholdHourlyEuros = 10.5,
             priceIsNetOfCommission = true
         )
         // 25 € pour 20 km total et 30 min total.
@@ -46,13 +44,11 @@ class ProfitabilityEngineTest {
     }
 
     @Test
-    fun `prix brut avec commission classe ROUGE`() {
+    fun `prix brut avec commission classe MAUVAIS`() {
         val settings = VehicleSettings(
             costPerKmEuros = 0.30,
             platformCommissionPercent = 25.0,
             socialChargesPercent = 22.0,
-            greenThresholdHourlyEuros = 15.0,
-            orangeThresholdHourlyEuros = 10.5,
             priceIsNetOfCommission = false   // le prix affiché est BRUT
         )
         val offer = RideOffer(
@@ -95,5 +91,45 @@ class ProfitabilityEngineTest {
         )
         assertNull(m.grossPricePerKmEuros)
         assertTrue(m.netHourlyRateEuros != null)
+    }
+
+    // --- Exemples des captures fournies (seuils par défaut : 1,00 €/km et 30 €/h) ---
+
+    private fun popup(price: Double, km: Double, min: Double) = engine.compute(
+        RideOffer(sourcePackage = "x", grossPriceEuros = price, rideDistanceKm = km, rideTimeMin = min),
+        VehicleSettings()
+    )
+
+    @Test
+    fun `Uber 16 euros 9 km 13 min = 1,78 euro par km, 74 euros par h, SUPER`() {
+        val m = popup(16.0, 9.0, 13.0)
+        assertEquals(1.78, m.grossPricePerKmEuros!!, 0.01)
+        assertEquals(73.85, m.grossHourlyRateEuros!!, 0.01)
+        assertEquals(ProfitabilityScore.GREEN, m.score)
+        assertEquals("SUPER", m.score.label)
+    }
+
+    @Test
+    fun `Heetch 14 euros 15 km 26 min = 0,93 euro par km, 32 euros par h, MOYEN`() {
+        val m = popup(14.0, 15.0, 26.0)
+        assertEquals(0.93, m.grossPricePerKmEuros!!, 0.01)
+        assertEquals(32.31, m.grossHourlyRateEuros!!, 0.01)
+        assertEquals(ProfitabilityScore.ORANGE, m.score) // €/km sous le seuil, €/h au-dessus -> le pire
+        assertEquals(0.93, m.thresholdRatio!!, 0.01)
+    }
+
+    @Test
+    fun `Bolt 10 euros 14 km 24 min = 0,71 euro par km, 25 euros par h, MAUVAIS`() {
+        val m = popup(10.0, 14.0, 24.0)
+        assertEquals(0.71, m.grossPricePerKmEuros!!, 0.01)
+        assertEquals(25.0, m.grossHourlyRateEuros!!, 0.01)
+        assertEquals(ProfitabilityScore.RED, m.score)
+        assertEquals("MAUVAIS", m.score.label)
+    }
+
+    @Test
+    fun `bon au km mais mauvais a l'heure donne MAUVAIS`() {
+        // 20 € / 10 km = 2 €/km (super) mais 20 € / 60 min = 20 €/h (< 80 % de 30)
+        assertEquals(ProfitabilityScore.RED, popup(20.0, 10.0, 60.0).score)
     }
 }

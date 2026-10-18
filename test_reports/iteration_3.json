@@ -1,0 +1,36 @@
+{
+  "summary": "Static Kotlin compilation and logic review of /app/drivee-copilote after the OverlayService → TYPE_ACCESSIBILITY_OVERLAY migration. Downloaded android.jar from platform-34-ext7_r03 + androidx core 1.12 .aar + kotlinx-coroutines-core-jvm 1.7.3, stubbed Hilt @AndroidEntryPoint, R.*, MainActivity, SettingsRepository and RideRepository, then compiled with kotlinc 1.9.22 / JDK 17 (aarch64). All target files (OfferOverlay.kt, GaugeView.kt, OfferDisplay.kt, ActiveNotification.kt, RideAccessibilityService.kt, RideParser.kt) + domain/* + data/config/* compile cleanly — EXIT=0, zero errors, only 2 'unused parameter' warnings in my stub (not the project). Re-ran existing JVM unit tests via kotlinc stubs + domain + data/config + RideParser + src/test/java with junit.jar: 18/18 PASS (ProfitabilityEngineTest + RideParserTest). Grep sweep confirms zero leftover references to removed symbols: 'OverlayService', 'hourlyNetTargetEuros', 'greenThresholdHourlyEuros', 'orangeThresholdHourlyEuros' — none in app/src/main or app/src/test. Deleted resources (res/layout/overlay_view.xml, res/drawable/bg_score_dot.xml, res/drawable/bg_overlay_card.xml) confirmed absent. res/font/jetbrains_mono_medium.ttf and res/drawable/ic_notification.xml present. AndroidManifest contains only POST_NOTIFICATIONS + REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (no SYSTEM_ALERT_WINDOW/FGS) + the a11y service with BIND_ACCESSIBILITY_SERVICE. res/xml/accessibility_service_config.xml declares typeWindowContentChanged|typeWindowStateChanged|typeWindowsChanged, flagRetrieveInteractiveWindows and packageNames include com.heetch.driver. All logic points verified: 250ms debounce (analyzeJob?.cancel + delay), collectRoots filters windows by Platforms.packages, scheduleHide 1200ms with isActive guard, offer signature dedupe, showDemo cycles 3 demo offers, OfferOverlay runs on Looper.getMainLooper(), drag/tap gesture via ViewConfiguration.scaledTouchSlop + hypot, auto-dismiss 30s, card width = min(screen-8dp, 520dp), gauge pos = ratio*0.6 clamp 0.03..0.97. No crash risks found: lateinit views only accessed after attach(); scope.cancel only in shutdown(); removeNow guards null root; dismissRunnable safely re-schedulable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/tmp/jt/testrun (unit tests 18/18 PASS)",
+    "/tmp/jt/compile2 (service+overlay+parser full kotlinc compile OK)",
+    "/tmp/p34/android-34/android.jar (SDK 34 reference)",
+    "/tmp/ax/core-classes.jar (androidx.core 1.12.0)",
+    "/tmp/coro/cc.jar (kotlinx-coroutines-core-jvm 1.7.3)"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OfferOverlay.kt — ALL opérations UI postées sur Handler(Looper.getMainLooper()), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY correctement utilisé, aucune permission SYSTEM_ALERT_WINDOW requise. Rendu/anim/drag OK.",
+    "RideAccessibilityService.kt — isRunning volatile, instance mise à jour dans onServiceConnected/shutdown, debounce 250ms, hide debounce 1,2s, dedupe par signature, showDemo thread-safe (scope.launch).",
+    "ActiveNotification.kt — vérifie POST_NOTIFICATIONS avant notify (API 33+), canal LOW importance, ongoing, FLAG_IMMUTABLE|FLAG_UPDATE_CURRENT, cancel sur shutdown. OK.",
+    "GaugeView.kt — @SuppressLint('ViewConstructor') nécessaire (constructor avec Typeface), onDraw sans allocation lourde (shaders recréés à chaque draw – acceptable car la vue n'est redessinée qu'à l'update()).",
+    "RideParser.kt — BFS borné à 1500 nœuds, try/catch sur viewIdResourceName, regex précompilées statiques, logique fallback (min/max) couverte par 10 tests unitaires.",
+    "DefaultParserConfig.kt — ancres communes (accepter/refuser/etc) + spécifiques (uberx, nouvelle course, etc.), bien séparé pour éviter les faux positifs sur l'écran Gains.",
+    "accessibility_service_config.xml — flagRetrieveInteractiveWindows présent → windows API peut être parcourue ; typeWindowsChanged capté → bascule entre fenêtres détectée.",
+    "AndroidManifest.xml — strictement conforme : seuls POST_NOTIFICATIONS + REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, service a11y protégé par BIND_ACCESSIBILITY_SERVICE.",
+    "Mineur (non bloquant) : AccessibilityNodeInfo.recycle() non appelé sur les nœuds parcourus par harvestTree. Deprecated en API 33+ (recyclage auto), mais sur API 26-32 (minSdk=26) théorique pression GC. Acceptable car parse court."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (projet Android natif, pas de backend)", "frontend": "100% (static compile + logic review, pas d'Expo/web)"},
+  "seed_data_creation": "N/A",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Projet Android Kotlin natif /app/drivee-copilote. Toolchain disponible dans le conteneur : kotlinc 1.9.22 à /tmp/kotlinc, JDK 17 aarch64 à /tmp/jdkarm/jdk-17.0.20.1+1. Pour compilation statique service d'accessibilité + overlay : classpath = /tmp/p34/android-34/android.jar + /tmp/ax/core-classes.jar + /tmp/coro/cc.jar + /tmp/jt/inject.jar + /tmp/jt/ser.jar + stubs minimaux Hilt/R/MainActivity dans /tmp/stubs2/. Tests unitaires JVM via /tmp/jt (stubs AccessibilityNodeInfo/Log + junit.jar + hamcrest.jar). Gradle build non reproductible (pas d'Android SDK/AGP) mais validation statique fiable à ce niveau.",
+  "rca_of_issue": "Pas de bug trouvé dans cette itération. L'architecture précédente (OverlayService démarré uniquement lors du parsing) exigeait un foreground service + SYSTEM_ALERT_WINDOW et ne pouvait démarrer en arrière-plan (restrictions Android 12+ sur FGS). La migration vers TYPE_ACCESSIBILITY_OVERLAY (WindowManager géré directement par RideAccessibilityService) élimine ces deux dépendances : la fenêtre vit tant que le service d'accessibilité est lié par le système (donc 24/7 dès que l'utilisateur l'a activé), aucune permission 'superposition' n'est requise, et ActiveNotification.show() postée dans onServiceConnected garantit la notification 'Drivee actif' visible immédiatement. Fix sain architecturalement, compile proprement, logique sans défaut de concurrence identifié."
+}

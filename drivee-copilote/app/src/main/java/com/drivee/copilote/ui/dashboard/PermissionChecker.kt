@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
+import androidx.core.app.NotificationManagerCompat
 import com.drivee.copilote.service.accessibility.RideAccessibilityService
 
 /**
@@ -14,7 +15,7 @@ import com.drivee.copilote.service.accessibility.RideAccessibilityService
  */
 object PermissionChecker {
 
-    /** L'utilisateur a-t-il activé notre service d'accessibilité ? */
+    /** L'utilisateur a-t-il activé notre service d'accessibilité dans les Réglages ? */
     fun isAccessibilityEnabled(context: Context): Boolean {
         val expected = ComponentName(context, RideAccessibilityService::class.java)
         val enabled = Settings.Secure.getString(
@@ -32,8 +33,9 @@ object PermissionChecker {
         return false
     }
 
-    /** La permission d'affichage par-dessus les autres apps est-elle accordée ? */
-    fun canDrawOverlays(context: Context): Boolean = Settings.canDrawOverlays(context)
+    /** Les notifications de l'app sont-elles autorisées ? */
+    fun areNotificationsEnabled(context: Context): Boolean =
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
 
     /** L'app est-elle exclue de l'optimisation de batterie (Doze) ? */
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
