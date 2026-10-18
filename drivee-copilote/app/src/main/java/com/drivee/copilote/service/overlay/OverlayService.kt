@@ -48,7 +48,7 @@ class OverlayService : Service() {
     private var overlayView: View? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val autoDismissRunnable = Runnable { removeOverlay() }
+    private val autoDismissRunnable: Runnable = Runnable { removeOverlay() }
 
     companion object {
         private const val TAG = "OverlayService"
@@ -151,16 +151,18 @@ class OverlayService : Service() {
         netPerKm: Double,
         grossPerKm: Double,
         score: ProfitabilityScore
-    ) = mainHandler.post {
-        try {
-            if (overlayView == null) inflateOverlay()
-            bindData(netHourly, netPerKm, grossPerKm, score)
+    ) {
+        mainHandler.post {
+            try {
+                if (overlayView == null) inflateOverlay()
+                bindData(netHourly, netPerKm, grossPerKm, score)
 
-            // Programme la disparition automatique.
-            mainHandler.removeCallbacks(autoDismissRunnable)
-            mainHandler.postDelayed(autoDismissRunnable, AUTO_DISMISS_MS)
-        } catch (t: Throwable) {
-            Log.w(TAG, "showOrUpdate a échoué", t)
+                // Programme la disparition automatique.
+                mainHandler.removeCallbacks(autoDismissRunnable)
+                mainHandler.postDelayed(autoDismissRunnable, AUTO_DISMISS_MS)
+            } catch (t: Throwable) {
+                Log.w(TAG, "showOrUpdate a échoué", t)
+            }
         }
     }
 
@@ -252,14 +254,16 @@ class OverlayService : Service() {
         }
     }
 
-    private fun removeOverlay() = mainHandler.post {
-        mainHandler.removeCallbacks(autoDismissRunnable)
-        overlayView?.let { v ->
-            runCatching { if (v.parent != null) windowManager.removeView(v) }
-                .onFailure { Log.w(TAG, "removeView a échoué", it) }
+    private fun removeOverlay() {
+        mainHandler.post {
+            mainHandler.removeCallbacks(autoDismissRunnable)
+            overlayView?.let { v ->
+                runCatching { if (v.parent != null) windowManager.removeView(v) }
+                    .onFailure { Log.w(TAG, "removeView a échoué", it) }
+            }
+            overlayView = null
+            layoutParams = null
         }
-        overlayView = null
-        layoutParams = null
     }
 
     // ------------------------------------------------------------------
