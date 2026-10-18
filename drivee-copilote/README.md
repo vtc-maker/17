@@ -63,6 +63,8 @@ statistiques, un export CSV comptable et un récap hebdomadaire partageable.
 
 ## 3. Compiler et installer (déploiement)
 
+> 🔰 **Débutant ?** Suivez le guide pas à pas illustré : [`BUILD_ANDROID_STUDIO_DEBUTANT.md`](./BUILD_ANDROID_STUDIO_DEBUTANT.md)
+
 ### 3.1 Récupérer le code
 
 ```bash

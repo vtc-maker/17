@@ -82,3 +82,5 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - **README.md réécrit** : déploiement (Android Studio, debug, signature, APK/AAB), guide d'utilisation
   complet, formule de calcul, adaptation du parser, architecture, tests, Play Store, dépannage, limites.
 - Non vérifiable ici : build Gradle Android complet (SDK absent), comportement a11y/overlay sur appareil.
+
+- 2026-10-18: Ajout BUILD_ANDROID_STUDIO_DEBUTANT.md (guide build Android Studio débutant), lien depuis README §3.
