@@ -155,6 +155,16 @@ Ou dans le **Terminal** intégré d'Android Studio (en bas) :
 ./gradlew test          # macOS / Linux
 gradlew.bat test        # Windows
 ```
+
+**Deux types de tests :**
+- `test` → tests **unitaires** (moteur de rentabilité, parseur) : tournent sur l'ordinateur, pas besoin de téléphone.
+- `connectedDebugAndroidTest` → tests **instrumentés** (dossier `app/src/androidTest`) : nécessitent un téléphone branché ou un émulateur.
+  ```bash
+  ./gradlew connectedDebugAndroidTest
+  ```
+  ⚠️ Si vous aviez l'erreur `ClassNotFoundException: androidx.test.runner.AndroidJUnitRunner`, faites 🐘 **Sync**, puis
+  désinstallez l'ancienne app de test du téléphone (`com.drivee.copilote.test`) avant de relancer.
+
 > Si `gradlew` est introuvable : Android Studio le génère normalement à la synchronisation.
 > Sinon, dans le Terminal : `gradle wrapper --gradle-version 8.2`.
 
