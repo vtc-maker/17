@@ -25,10 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivee.copilote.domain.model.VehicleSettings
+import kotlinx.coroutines.delay
 
 /**
  * Écran "Paramètres de calcul" : coûts/km, commission, charges, objectif horaire,
@@ -45,6 +47,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     var green by remember { mutableStateOf("") }
     var orange by remember { mutableStateOf("") }
     var priceIsNet by remember { mutableStateOf(true) }
+    var savedAt by remember { mutableStateOf(0L) }
+
+    // Message de confirmation éphémère (2 s) après l'enregistrement.
+    LaunchedEffect(savedAt) {
+        if (savedAt != 0L) { delay(2_000); savedAt = 0L }
+    }
 
     // Initialise les champs quand les paramètres persistés sont chargés.
     LaunchedEffect(settings) {
@@ -120,8 +128,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         priceIsNetOfCommission = priceIsNet
                     )
                 )
+                savedAt = System.currentTimeMillis()
             }
         ) { Text("Enregistrer") }
+
+        if (savedAt != 0L) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "✓ Paramètres enregistrés",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
     }
@@ -137,7 +156,7 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
         onValueChange = onChange,
         label = { Text(label) },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
     )
 }
 

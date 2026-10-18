@@ -48,6 +48,7 @@ fun DashboardScreen() {
 
     var a11yEnabled by remember { mutableStateOf(PermissionChecker.isAccessibilityEnabled(context)) }
     var overlayEnabled by remember { mutableStateOf(PermissionChecker.canDrawOverlays(context)) }
+    var batteryOk by remember { mutableStateOf(PermissionChecker.isIgnoringBatteryOptimizations(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
 
     // Rafraîchit l'état des permissions au retour dans l'app.
@@ -56,6 +57,7 @@ fun DashboardScreen() {
             if (event == Lifecycle.Event.ON_RESUME) {
                 a11yEnabled = PermissionChecker.isAccessibilityEnabled(context)
                 overlayEnabled = PermissionChecker.canDrawOverlays(context)
+                batteryOk = PermissionChecker.isIgnoringBatteryOptimizations(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -109,8 +111,8 @@ fun DashboardScreen() {
         PermissionCard(
             title = "Optimisation de la batterie",
             description = "Recommandé : exclure Drivee de l'optimisation pour que l'analyse reste active en arrière-plan.",
-            granted = false,
-            actionLabel = "Configurer",
+            granted = batteryOk,
+            actionLabel = if (batteryOk) "Exclu" else "Configurer",
             onClick = { openBatterySettings(context) }
         )
     }
@@ -169,7 +171,7 @@ private fun PermissionCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onClick, enabled = !granted || actionLabel == "Configurer") {
+            Button(onClick = onClick, enabled = !granted) {
                 Text(actionLabel)
             }
         }

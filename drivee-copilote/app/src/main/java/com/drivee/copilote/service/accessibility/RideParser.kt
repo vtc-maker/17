@@ -5,7 +5,6 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.drivee.copilote.data.config.PackageRules
 import com.drivee.copilote.data.config.ParserConfig
 import com.drivee.copilote.domain.model.RideOffer
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,14 +35,13 @@ class RideParser @Inject constructor() {
     }
 
     /** Résultat interne du parcours d'arbre. */
-    private data class Harvest(
+    internal data class Harvest(
         val texts: MutableList<String> = mutableListOf(),
         val byViewId: MutableMap<String, String> = mutableMapOf()
     )
 
     fun parse(root: AccessibilityNodeInfo?, pkg: String, config: ParserConfig): RideOffer? {
         if (root == null) return null
-        val rules = config.rulesFor(pkg) ?: return null
 
         val harvest = try {
             harvestTree(root)
@@ -51,7 +49,24 @@ class RideParser @Inject constructor() {
             Log.w(TAG, "Échec du parcours de l'arbre", t)
             return null
         }
+        return parseHarvest(harvest, pkg, config)
+    }
 
+    /**
+     * Extraction PURE (sans Android) à partir des textes collectés — testable en JVM.
+     * [texts] : tous les textes visibles ; [byViewId] : resource-id -> texte.
+     */
+    fun parseTexts(
+        texts: List<String>,
+        pkg: String,
+        config: ParserConfig,
+        byViewId: Map<String, String> = emptyMap()
+    ): RideOffer? = parseHarvest(
+        Harvest(texts.toMutableList(), byViewId.toMutableMap()), pkg, config
+    )
+
+    private fun parseHarvest(harvest: Harvest, pkg: String, config: ParserConfig): RideOffer? {
+        val rules = config.rulesFor(pkg) ?: return null
         if (harvest.texts.isEmpty()) return null
         val joined = harvest.texts.joinToString("\n")
 
@@ -70,14 +85,17 @@ class RideParser @Inject constructor() {
         var rideMin = extractNumber(joined, rules.rideTimePatterns)
 
         // 4) Repli heuristique si les libellés n'ont pas permis de distinguer.
+        //    - 2 valeurs ou plus : la plus petite = approche, la plus grande = course.
+        //    - 1 seule valeur : on la considère comme la course (certaines cartes Bolt
+        //      n'affichent qu'une distance/durée).
         val kmFallback = allNumbersFollowedBy(joined, "km")
         val minFallback = allNumbersFollowedBy(joined, "min")
-        if (approachKm == null && rideKm == null && kmFallback.size >= 2) {
-            approachKm = kmFallback.min()
+        if (approachKm == null && rideKm == null && kmFallback.isNotEmpty()) {
+            if (kmFallback.size >= 2) approachKm = kmFallback.min()
             rideKm = kmFallback.max()
         }
-        if (approachMin == null && rideMin == null && minFallback.size >= 2) {
-            approachMin = minFallback.min()
+        if (approachMin == null && rideMin == null && minFallback.isNotEmpty()) {
+            if (minFallback.size >= 2) approachMin = minFallback.min()
             rideMin = minFallback.max()
         }
 

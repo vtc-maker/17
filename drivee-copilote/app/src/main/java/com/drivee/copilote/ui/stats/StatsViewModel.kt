@@ -53,7 +53,8 @@ class StatsViewModel @Inject constructor(
     private val weeksBack = 6
 
     val uiState: StateFlow<StatsUiState> =
-        repository.observeBetween(startOfWeeksAgo(weeksBack - 1), now())
+        // Borne haute ouverte : les nouvelles courses apparaissent en direct.
+        repository.observeBetween(startOfWeeksAgo(weeksBack - 1), Long.MAX_VALUE)
             .map { rides -> aggregate(rides) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
 
@@ -113,8 +114,6 @@ class StatsViewModel @Inject constructor(
     }
 
     // ------- helpers dates (semaine commençant le lundi, FR) -------
-    private fun now() = System.currentTimeMillis()
-
     private fun startOfCurrentWeek(): Long = Calendar.getInstance(Locale.FRANCE).apply {
         firstDayOfWeek = Calendar.MONDAY
         set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)

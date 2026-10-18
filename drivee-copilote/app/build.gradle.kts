@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.dagger.hilt.android")
-    kotlin("kapt")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {

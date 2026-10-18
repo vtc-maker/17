@@ -110,7 +110,8 @@ class RideAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        OverlayService.hide(this)
+        // Service d'accessibilité désactivé par l'utilisateur : on coupe tout (vignette + notification).
+        OverlayService.stop(this)
         scope.cancel()
         return super.onUnbind(intent)
     }

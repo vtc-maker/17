@@ -1,7 +1,6 @@
 package com.drivee.copilote.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.drivee.copilote.data.local.entity.VehicleSettingsEntity

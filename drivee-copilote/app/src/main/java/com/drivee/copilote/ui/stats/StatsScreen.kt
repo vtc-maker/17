@@ -206,7 +206,8 @@ private fun DrawScope.drawBars(
     )
 
     values.forEachIndexed { i, v ->
-        val h = (v / maxValue) * (size.height * 0.9f)
+        // Un revenu net négatif (course à perte) est tracé à 0 : pas de barre inversée.
+        val h = (v.coerceAtLeast(0f) / maxValue) * (size.height * 0.9f)
         val left = i * slot + (slot - barWidth) / 2f
         drawRoundRect(
             color = barColor,

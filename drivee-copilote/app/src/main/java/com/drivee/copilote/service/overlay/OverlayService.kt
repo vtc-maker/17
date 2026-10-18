@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -20,6 +21,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.drivee.copilote.R
 import com.drivee.copilote.domain.model.ProfitabilityMetrics
 import com.drivee.copilote.domain.model.ProfitabilityScore
@@ -56,11 +58,16 @@ class OverlayService : Service() {
 
         private const val ACTION_SHOW = "com.drivee.copilote.SHOW"
         private const val ACTION_HIDE = "com.drivee.copilote.HIDE"
+        private const val ACTION_STOP = "com.drivee.copilote.STOP"
 
         private const val EXTRA_NET_HOURLY = "net_hourly"
         private const val EXTRA_NET_PER_KM = "net_per_km"
         private const val EXTRA_GROSS_PER_KM = "gross_per_km"
         private const val EXTRA_SCORE = "score"
+
+        /** Le service est-il actuellement vivant ? (évite de le démarrer juste pour "masquer"). */
+        @Volatile
+        private var isRunning = false
 
         /** Affiche/actualise la vignette avec les [metrics] fournies. */
         fun show(context: Context, metrics: ProfitabilityMetrics) {
@@ -79,8 +86,17 @@ class OverlayService : Service() {
             startFgsCompat(context, intent)
         }
 
+        /** Masque la vignette (le service reste prêt pour la prochaine offre). */
         fun hide(context: Context) {
+            if (!isRunning) return
             val intent = Intent(context, OverlayService::class.java).apply { action = ACTION_HIDE }
+            runCatching { context.startService(intent) }
+        }
+
+        /** Arrête complètement le service (ex: service d'accessibilité désactivé). */
+        fun stop(context: Context) {
+            if (!isRunning) return
+            val intent = Intent(context, OverlayService::class.java).apply { action = ACTION_STOP }
             runCatching { context.startService(intent) }
         }
 
@@ -99,6 +115,7 @@ class OverlayService : Service() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundCompat()
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -116,6 +133,11 @@ class OverlayService : Service() {
                 )
             }
             ACTION_HIDE -> removeOverlay()
+            ACTION_STOP -> {
+                removeOverlay()
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
         // START_NOT_STICKY : ne pas recréer automatiquement sans données.
         return START_NOT_STICKY
@@ -261,12 +283,18 @@ class OverlayService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
 
-        runCatching { startForeground(NOTIF_ID, notification) }
+        // Android 14+ exige le TYPE de foreground service (specialUse, déclaré dans le Manifest).
+        val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        else 0
+
+        runCatching { ServiceCompat.startForeground(this, NOTIF_ID, notification, fgsType) }
             .onFailure { Log.w(TAG, "startForeground a échoué", it) }
     }
 
     override fun onDestroy() {
         removeOverlay()
+        isRunning = false
         super.onDestroy()
     }
 

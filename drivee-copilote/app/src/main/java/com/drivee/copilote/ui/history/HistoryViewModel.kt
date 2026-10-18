@@ -58,11 +58,12 @@ class HistoryViewModel @Inject constructor(
     fun setFilter(f: HistoryFilter) { filter.value = f }
 
     private fun HistoryFilter.range(): Pair<Long, Long> {
-        val now = System.currentTimeMillis()
+        // Borne haute ouverte : les courses enregistrées APRÈS le choix du filtre
+        // doivent apparaître en direct (le Flow Room se met à jour tout seul).
         return when (this) {
-            HistoryFilter.ALL -> 0L to now
-            HistoryFilter.TODAY -> startOfToday() to now
-            HistoryFilter.WEEK -> (now - 7L * 24 * 3600 * 1000) to now
+            HistoryFilter.ALL -> 0L to Long.MAX_VALUE
+            HistoryFilter.TODAY -> startOfToday() to Long.MAX_VALUE
+            HistoryFilter.WEEK -> (System.currentTimeMillis() - 7L * 24 * 3600 * 1000) to Long.MAX_VALUE
         }
     }
 

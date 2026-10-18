@@ -31,17 +31,17 @@ object DefaultParserConfig {
                 ),
                 // "5,2 km · 8 min de trajet jusqu'au client" (approche)
                 approachDistancePatterns = listOf(
-                    "(?i)$NUM$SP km[^.]*?(?:client|prise en charge|pickup|away|d'approche)"
+                    "(?i)$NUM$SP km[^.\\n]*?(?:client|prise en charge|pickup|away|d'approche)"
                 ),
                 approachTimePatterns = listOf(
-                    "(?i)$NUM$SP min[^.]*?(?:client|prise en charge|pickup|away|d'approche)"
+                    "(?i)$NUM$SP min[^.\\n]*?(?:client|prise en charge|pickup|away|d'approche)"
                 ),
                 // "18,4 km · 25 min de course" (trajet)
                 rideDistancePatterns = listOf(
-                    "(?i)$NUM$SP km[^.]*?(?:trajet|course|trip|destination|dropoff)"
+                    "(?i)$NUM$SP km[^.\\n]*?(?:trajet|course|trip|destination|dropoff)"
                 ),
                 rideTimePatterns = listOf(
-                    "(?i)$NUM$SP min[^.]*?(?:trajet|course|trip|destination|dropoff)"
+                    "(?i)$NUM$SP min[^.\\n]*?(?:trajet|course|trip|destination|dropoff)"
                 ),
                 pickupAddressPatterns = listOf(
                     "(?i)(?:prise en charge|pickup)$SP[:\\-]?$SP(.+)"
@@ -49,8 +49,12 @@ object DefaultParserConfig {
                 destinationAddressPatterns = listOf(
                     "(?i)(?:destination|dropoff|dépose)$SP[:\\-]?$SP(.+)"
                 ),
+                // Ancre = libellés propres à la CARTE D'OFFRE (bouton Accepter/Refuser…).
+                // Le seul symbole "€" est volontairement exclu : il déclencherait l'analyse
+                // sur l'écran "Gains" et créerait de fausses courses dans l'historique.
                 offerAnchorPatterns = listOf(
-                    "(?i)accepter", "(?i)accept", "(?i)nouvelle course", "(?i)uberx", "(?i)€"
+                    "(?i)accepter", "(?i)accept", "(?i)refuser", "(?i)décliner",
+                    "(?i)nouvelle course", "(?i)uberx", "(?i)comfort", "(?i)green"
                 )
             ),
             "ee.mtakso.driver" to PackageRules(
@@ -63,16 +67,16 @@ object DefaultParserConfig {
                     "(?i)€$SP$NUM"
                 ),
                 approachDistancePatterns = listOf(
-                    "(?i)$NUM$SP km[^.]*?(?:client|prise en charge|pickup|approche)"
+                    "(?i)$NUM$SP km[^.\\n]*?(?:client|prise en charge|pickup|approche)"
                 ),
                 approachTimePatterns = listOf(
-                    "(?i)$NUM$SP min[^.]*?(?:client|prise en charge|pickup|approche)"
+                    "(?i)$NUM$SP min[^.\\n]*?(?:client|prise en charge|pickup|approche)"
                 ),
                 rideDistancePatterns = listOf(
-                    "(?i)$NUM$SP km[^.]*?(?:trajet|course|destination|dépose)"
+                    "(?i)$NUM$SP km[^.\\n]*?(?:trajet|course|destination|dépose)"
                 ),
                 rideTimePatterns = listOf(
-                    "(?i)$NUM$SP min[^.]*?(?:trajet|course|destination|dépose)"
+                    "(?i)$NUM$SP min[^.\\n]*?(?:trajet|course|destination|dépose)"
                 ),
                 pickupAddressPatterns = listOf(
                     "(?i)(?:prise en charge|départ)$SP[:\\-]?$SP(.+)"
@@ -81,7 +85,8 @@ object DefaultParserConfig {
                     "(?i)(?:destination|dépose)$SP[:\\-]?$SP(.+)"
                 ),
                 offerAnchorPatterns = listOf(
-                    "(?i)accepter", "(?i)accept", "(?i)nouvelle demande", "(?i)€"
+                    "(?i)accepter", "(?i)accept", "(?i)refuser", "(?i)décliner",
+                    "(?i)nouvelle demande", "(?i)nouvelle commande"
                 )
             )
         )

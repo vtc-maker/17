@@ -63,3 +63,22 @@ service (AccessibilityService + RideParser + OverlayService), ui (Compose : dash
 ## Notes
 - Non exécutable sur Expo/preview ; ouvrir dans Android Studio, tester sur appareil réel.
 - Aucune donnée d'écran transmise en ligne (traitement 100 % local).
+
+## Audit & vérification (2026-06, itération 4)
+Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des couches pures.
+- **Blocages de build corrigés** : icônes launcher absentes (adaptive icon `mipmap-anydpi-v26` +
+  `ic_launcher_foreground`), `app/proguard-rules.pro` créé (règles kotlinx-serialization),
+  `gradle.properties` créé (`android.useAndroidX=true` obligatoire), `gradle/wrapper/gradle-wrapper.properties`
+  (Gradle 8.2), namespace `xmlns:tools` manquant dans `overlay_view.xml`, plugin kapt déclaré à la racine, `.gitignore`.
+- **Bugs logiques corrigés** : regex parser débordant sur plusieurs lignes (`[^.]*?` → `[^.\n]*?`),
+  offre à distance/durée unique rejetée (repli : 1 valeur = course), ancre `€` seule supprimée
+  (faux positifs écran Gains), filtres Historique/Stats figés à l'instant de création (borne haute
+  `Long.MAX_VALUE`), barres négatives dans les graphes, détection accessibilité par `ComponentName`
+  (forme courte/longue), état réel de l'optimisation batterie, `hide()` ne démarre plus le FGS,
+  `OverlayService.stop()` à la désactivation de l'accessibilité, type FGS `specialUse` explicite
+  (Android 14), clavier `Decimal`, confirmation "✓ Paramètres enregistrés".
+- **Tests** : `RideParser.parseTexts()` extrait (pur, testable) ; `RideParserTest` (7 cas) ajouté.
+  11 tests JVM exécutés avec succès (ProfitabilityEngineTest 4 + RideParserTest 7).
+- **README.md réécrit** : déploiement (Android Studio, debug, signature, APK/AAB), guide d'utilisation
+  complet, formule de calcul, adaptation du parser, architecture, tests, Play Store, dépannage, limites.
+- Non vérifiable ici : build Gradle Android complet (SDK absent), comportement a11y/overlay sur appareil.
