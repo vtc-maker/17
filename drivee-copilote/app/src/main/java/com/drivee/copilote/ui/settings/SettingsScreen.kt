@@ -46,6 +46,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     var perKmThreshold by remember { mutableStateOf("") }
     var hourlyThreshold by remember { mutableStateOf("") }
     var mediumPercent by remember { mutableStateOf("") }
+    var avgSpeed by remember { mutableStateOf("") }
+    var soundOn by remember { mutableStateOf(true) }
     var priceIsNet by remember { mutableStateOf(true) }
     var savedAt by remember { mutableStateOf(0L) }
 
@@ -62,6 +64,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         perKmThreshold = settings.perKmThresholdEuros.frText()
         hourlyThreshold = settings.hourlyThresholdEuros.frText()
         mediumPercent = settings.mediumThresholdPercent.frText()
+        avgSpeed = settings.avgSpeedKmh.frText()
+        soundOn = settings.soundEnabled
         priceIsNet = settings.priceIsNetOfCommission
     }
 
@@ -93,6 +97,27 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         NumberField("Seuil rentable (€/km)", perKmThreshold) { perKmThreshold = it }
         NumberField("Seuil rentable (€/h)", hourlyThreshold) { hourlyThreshold = it }
         NumberField("Zone MOYEN à partir de (% du seuil)", mediumPercent) { mediumPercent = it }
+        NumberField("Vitesse moyenne estimée (km/h)", avgSpeed) { avgSpeed = it }
+        Text(
+            "Sert à estimer la durée quand l'app ne l'affiche pas (Bolt) : la durée apparaît alors avec « ~ ».",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Son du verdict", color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "Deux notes montantes = SUPER, une note = MOYEN, deux notes graves = MAUVAIS",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = soundOn, onCheckedChange = { soundOn = it })
+        }
 
         Spacer(Modifier.height(16.dp))
         Text(
@@ -136,6 +161,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         perKmThresholdEuros = perKmThreshold.frDouble(1.0),
                         hourlyThresholdEuros = hourlyThreshold.frDouble(30.0),
                         mediumThresholdPercent = mediumPercent.frDouble(80.0),
+                        avgSpeedKmh = avgSpeed.frDouble(35.0),
+                        soundEnabled = soundOn,
                         priceIsNetOfCommission = priceIsNet
                     )
                 )

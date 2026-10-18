@@ -24,8 +24,26 @@ data class RideOffer(
     val pickupAddress: String? = null,
     val destinationAddress: String? = null,
     val rawTexts: List<String> = emptyList(),
-    val capturedAtEpochMs: Long = System.currentTimeMillis()
+    val capturedAtEpochMs: Long = System.currentTimeMillis(),
+    /** true si une durée manquante a été estimée à partir de la distance (ex : Bolt n'affiche pas la durée de course). */
+    val timeEstimated: Boolean = false
 ) {
+    /**
+     * Complète les durées absentes à partir des distances et d'une vitesse moyenne.
+     * Indispensable pour Bolt, qui n'affiche que la distance de la course.
+     */
+    fun withEstimatedTimes(avgSpeedKmh: Double): RideOffer {
+        if (avgSpeedKmh <= 0.0) return this
+        val estRide = if (rideTimeMin == null && rideDistanceKm != null) rideDistanceKm / avgSpeedKmh * 60.0 else null
+        val estApproach = if (approachTimeMin == null && approachDistanceKm != null) approachDistanceKm / avgSpeedKmh * 60.0 else null
+        if (estRide == null && estApproach == null) return this
+        return copy(
+            rideTimeMin = rideTimeMin ?: estRide,
+            approachTimeMin = approachTimeMin ?: estApproach,
+            timeEstimated = true
+        )
+    }
+
     /** Distance totale = approche + course (km). */
     val totalDistanceKm: Double?
         get() = combine(approachDistanceKm, rideDistanceKm)

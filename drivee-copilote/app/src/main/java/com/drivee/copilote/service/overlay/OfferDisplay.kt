@@ -14,7 +14,8 @@ data class OfferDisplay(
     val minutes: Double?,
     val km: Double?,
     val score: ProfitabilityScore,
-    val thresholdRatio: Double?
+    val thresholdRatio: Double?,
+    val timeEstimated: Boolean = false
 ) {
     companion object {
         fun from(offer: RideOffer, metrics: ProfitabilityMetrics) = OfferDisplay(
@@ -25,7 +26,8 @@ data class OfferDisplay(
             minutes = offer.totalTimeMin,
             km = offer.totalDistanceKm,
             score = metrics.score,
-            thresholdRatio = metrics.thresholdRatio
+            thresholdRatio = metrics.thresholdRatio,
+            timeEstimated = offer.timeEstimated
         )
 
         /** Offres de démonstration (bouton "Tester la pop-up"). */

@@ -16,5 +16,7 @@ data class VehicleSettingsEntity(
     val perKmThresholdEuros: Double = 1.0,
     val hourlyThresholdEuros: Double = 30.0,
     val mediumThresholdPercent: Double = 80.0,
+    val avgSpeedKmh: Double = 35.0,
+    val soundEnabled: Boolean = true,
     val priceIsNetOfCommission: Boolean = true
 )

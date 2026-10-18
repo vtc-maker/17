@@ -137,6 +137,56 @@ class RideParserTest {
     }
 
     @Test
+    fun `capture reelle Uber - a moins de 1 min (0 km) puis Course de 24 min (8,1 km)`() {
+        val texts = listOf(
+            "UberX", "17,51 €", "5,00", "Hors frais de service",
+            "à <1 min (0 km)", "Rue de la Montagne 55, Bruxelles",
+            "Course de 24 min (8.1 km)", "Av. du Manoir 23, Uccle",
+            "Accepter"
+        )
+
+        val offer = parser.parseTexts(texts, "com.ubercab.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(17.51, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(0.0, offer.approachDistanceKm!!, 0.001)
+        assertEquals(1.0, offer.approachTimeMin!!, 0.001)
+        assertEquals(8.1, offer.rideDistanceKm!!, 0.001)
+        assertEquals(24.0, offer.rideTimeMin!!, 0.001)
+    }
+
+    @Test
+    fun `capture reelle Bolt - approche en metres, course sans duree`() {
+        val texts = listOf(
+            "Refuser", "<1 min", "135 m",
+            "Zone Accueil - Entrée, Parc Astérix",
+            "Gare de Gagny, Gagny • 35.5 km",
+            "Green • Amira", "5.0", "1.2x forte demande", "Sur l'app",
+            "35.51€ · Net, TTC", "Accepter"
+        )
+
+        val offer = parser.parseTexts(texts, "ee.mtakso.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(35.51, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(0.135, offer.approachDistanceKm!!, 0.0001)
+        assertEquals(1.0, offer.approachTimeMin!!, 0.001)
+        assertEquals(35.5, offer.rideDistanceKm!!, 0.001)
+        assertNull(offer.rideTimeMin) // Bolt n'affiche pas la durée de course
+
+        // Estimation à 35 km/h : 35.5 km -> ~60.9 min de course
+        val est = offer.withEstimatedTimes(35.0)
+        assertEquals(60.86, est.rideTimeMin!!, 0.01)
+        assertEquals(true, est.timeEstimated)
+    }
+
+    @Test
+    fun `les minutes ne sont pas lues comme des metres`() {
+        val offer = parser.parseTexts(listOf("Accepter", "9,80 €", "3 min · 1,1 km", "15 min · 7,4 km"), "ee.mtakso.driver", config)
+        assertEquals(8.5, offer!!.totalDistanceKm!!, 0.001)
+    }
+
+    @Test
     fun `km sans espace accepte`() {
         val offer = parser.parseTexts(listOf("Accepter", "9,80€", "7,4km", "15min"), "ee.mtakso.driver", config)
 

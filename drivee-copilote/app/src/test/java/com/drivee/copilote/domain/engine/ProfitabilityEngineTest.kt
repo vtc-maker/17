@@ -132,4 +132,27 @@ class ProfitabilityEngineTest {
         // 20 € / 10 km = 2 €/km (super) mais 20 € / 60 min = 20 €/h (< 80 % de 30)
         assertEquals(ProfitabilityScore.RED, popup(20.0, 10.0, 60.0).score)
     }
+
+    @Test
+    fun `capture Bolt 35,51 euros - duree estimee - MOYEN`() {
+        val offer = RideOffer(
+            sourcePackage = "ee.mtakso.driver", grossPriceEuros = 35.51,
+            approachDistanceKm = 0.135, approachTimeMin = 1.0, rideDistanceKm = 35.5
+        ).withEstimatedTimes(35.0)
+        val m = engine.compute(offer, VehicleSettings())
+        assertEquals(1.0, m.grossPricePerKmEuros!!, 0.01)   // 35.51 / 35.635
+        assertEquals(34.44, m.grossHourlyRateEuros!!, 0.05)  // 35.51 / 61.86 min
+        assertEquals(ProfitabilityScore.ORANGE, m.score)     // 0,996 du seuil €/km
+    }
+
+    @Test
+    fun `capture Uber 17,51 euros 8,1 km 25 min - SUPER`() {
+        val m = engine.compute(
+            RideOffer("com.ubercab.driver", grossPriceEuros = 17.51, approachDistanceKm = 0.0, approachTimeMin = 1.0, rideDistanceKm = 8.1, rideTimeMin = 24.0),
+            VehicleSettings()
+        )
+        assertEquals(2.16, m.grossPricePerKmEuros!!, 0.01)
+        assertEquals(42.02, m.grossHourlyRateEuros!!, 0.01)
+        assertEquals(ProfitabilityScore.GREEN, m.score)
+    }
 }

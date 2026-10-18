@@ -26,6 +26,12 @@ data class VehicleSettings(
     /** Zone MOYEN : à partir de ce pourcentage du seuil (en dessous = MAUVAIS). */
     val mediumThresholdPercent: Double = 80.0,
 
+    /** Vitesse moyenne (km/h) pour estimer une durée non affichée (Bolt n'affiche que les km de course). */
+    val avgSpeedKmh: Double = 35.0,
+
+    /** Jouer un son différent pour SUPER / MOYEN / MAUVAIS à l'apparition de la pop-up. */
+    val soundEnabled: Boolean = true,
+
     /** Le prix affiché par la plateforme est-il déjà NET (commission déduite) ? */
     val priceIsNetOfCommission: Boolean = true
 )

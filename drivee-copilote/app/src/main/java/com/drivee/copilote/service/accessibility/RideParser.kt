@@ -96,8 +96,16 @@ class RideParser @Inject constructor() {
 
         // 4) Repli heuristique sur toutes les valeurs "X km" / "X min" de l'écran :
         //    la plus petite = approche, la plus grande = course ; complète les champs manquants.
-        val kmFallback = allNumbersFollowedBy(joined, "km")
+        val kmFallback = allNumbersFollowedBy(joined, "km") + allMeters(joined)
         val minFallback = allNumbersFollowedBy(joined, "min")
+
+        // Cas Bolt : "<1 min · 135 m" (approche) puis "Gare de Gagny · 35.5 km" (course SANS durée).
+        // Une seule durée mais 2 distances -> cette durée est celle de l'approche ;
+        // la durée de course sera estimée depuis la distance (RideOffer.withEstimatedTimes).
+        if (approachMin == null && rideMin == null && minFallback.size == 1 && kmFallback.size >= 2) {
+            approachMin = minFallback.first()
+        }
+
         fillFromFallback(approachKm, rideKm, kmFallback).let { approachKm = it.first; rideKm = it.second }
         fillFromFallback(approachMin, rideMin, minFallback).let { approachMin = it.first; rideMin = it.second }
 
@@ -200,6 +208,12 @@ class RideParser @Inject constructor() {
             ride == null -> approach to values.filter { it != approach }.maxOrNull()
             else -> values.filter { it < ride }.minOrNull() to ride
         }
+    }
+
+    /** Distances en MÈTRES ("135 m") converties en km. "min" et les mots ("m²", "mai") sont exclus. */
+    private fun allMeters(text: String): List<Double> {
+        val regex = Regex("(?<![\\d.,])(\\d+(?:[.,]\\d{1,2})?)[\\s\\u00A0\\u202F]*m(?![a-zA-ZÀ-ÿ²])")
+        return regex.findAll(text).mapNotNull { parseNumber(it.groupValues[1])?.div(1000.0) }.toList()
     }
 
     /** Renvoie tous les nombres suivis d'une unité (ex: "5,2 km" -> 5.2). */

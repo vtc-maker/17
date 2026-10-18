@@ -223,6 +223,8 @@ Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confir
 - 🔴 **MAUVAIS** : le plus faible des deux sous 80 % du seuil
 
 4. La pop-up disparaît quand l'offre quitte l'écran (ou après 30 s), ou d'un simple **appui**. **Glissez-la** pour la déplacer.
+5. **Son du verdict** (désactivable dans Réglages) : deux notes montantes = SUPER, une note = MOYEN, deux notes graves = MAUVAIS. Joué comme un guidage GPS (la musique baisse brièvement).
+6. **Bolt** n'affiche pas la durée de la course : elle est estimée avec la *vitesse moyenne* des Réglages (35 km/h par défaut) et s'affiche avec « ~ » (ex. `~62 min · 36 km`). Les distances en mètres (`135 m`) sont reconnues.
 5. La course analysée est **enregistrée dans l'Historique** quelle que soit votre décision (accepter ou non).
 
 ### 4.4 Historique 📋

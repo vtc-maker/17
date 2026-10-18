@@ -211,7 +211,7 @@ class OfferOverlay(private val context: Context) {
         priceTv.setShadowLayer(dp(14f), 0f, 0f, withAlpha(color, 0.75f))
         hourlyTv.text = withUnit(d.hourly?.let { fmt("%.0f€", it) } ?: "—", "/h")
         tripTv.text = listOfNotNull(
-            d.minutes?.let { "${it.roundToInt()} min" },
+            d.minutes?.let { (if (d.timeEstimated) "~" else "") + "${it.roundToInt()} min" },
             d.km?.let { "${formatKm(it)} km" }
         ).joinToString(" · ")
 

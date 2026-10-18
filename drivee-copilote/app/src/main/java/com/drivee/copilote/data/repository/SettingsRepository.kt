@@ -39,6 +39,8 @@ class SettingsRepository @Inject constructor(
         perKmThresholdEuros = perKmThresholdEuros,
         hourlyThresholdEuros = hourlyThresholdEuros,
         mediumThresholdPercent = mediumThresholdPercent,
+        avgSpeedKmh = avgSpeedKmh,
+        soundEnabled = soundEnabled,
         priceIsNetOfCommission = priceIsNetOfCommission
     )
 
@@ -50,6 +52,8 @@ class SettingsRepository @Inject constructor(
         perKmThresholdEuros = perKmThresholdEuros,
         hourlyThresholdEuros = hourlyThresholdEuros,
         mediumThresholdPercent = mediumThresholdPercent,
+        avgSpeedKmh = avgSpeedKmh,
+        soundEnabled = soundEnabled,
         priceIsNetOfCommission = priceIsNetOfCommission
     )
 }

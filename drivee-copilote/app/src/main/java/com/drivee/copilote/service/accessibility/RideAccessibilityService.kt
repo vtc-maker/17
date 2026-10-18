@@ -11,6 +11,7 @@ import com.drivee.copilote.domain.engine.ProfitabilityEngine
 import com.drivee.copilote.domain.model.Platforms
 import com.drivee.copilote.service.overlay.OfferDisplay
 import com.drivee.copilote.service.overlay.OfferOverlay
+import com.drivee.copilote.service.overlay.VerdictSound
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,7 @@ class RideAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val overlay by lazy { OfferOverlay(this) }
+    private val sound by lazy { VerdictSound(this) }
 
     private var analyzeJob: Job? = null
     private var hideJob: Job? = null
@@ -96,11 +98,11 @@ class RideAccessibilityService : AccessibilityService() {
     private suspend fun handleScreen() {
         val roots = collectRoots()
         val pkg = roots.firstOrNull()?.packageName?.toString()
-        val offer = pkg?.let {
+        val parsed = pkg?.let {
             parser.parseRoots(roots.filter { r -> r.packageName?.toString() == it }, it, settingsRepository.getParserConfig())
         }
 
-        if (offer == null) {
+        if (parsed == null) {
             scheduleHide()
             return
         }
@@ -108,12 +110,16 @@ class RideAccessibilityService : AccessibilityService() {
         hideJob = null
 
         // Déduplication : même offre -> rien à refaire.
-        val signature = "${offer.sourcePackage}|${offer.grossPriceEuros}|${offer.totalDistanceKm}|${offer.totalTimeMin}"
+        val signature = "${parsed.sourcePackage}|${parsed.grossPriceEuros}|${parsed.totalDistanceKm}|${parsed.totalTimeMin}"
         if (signature == lastOfferSignature) return
         lastOfferSignature = signature
 
-        val metrics = engine.compute(offer, settingsRepository.getSettings())
+        val settings = settingsRepository.getSettings()
+        // Bolt n'affiche pas la durée de course : estimation depuis la distance.
+        val offer = parsed.withEstimatedTimes(settings.avgSpeedKmh)
+        val metrics = engine.compute(offer, settings)
         overlay.show(OfferDisplay.from(offer, metrics))
+        if (settings.soundEnabled) sound.play(metrics.score)
 
         runCatching { rideRepository.save(offer, metrics) }
             .onFailure { Log.w(TAG, "Échec sauvegarde course", it) }
@@ -142,8 +148,10 @@ class RideAccessibilityService : AccessibilityService() {
         val offer = OfferDisplay.demoOffers[demoIndex % OfferDisplay.demoOffers.size]
         demoIndex++
         scope.launch {
-            val metrics = engine.compute(offer, settingsRepository.getSettings())
+            val settings = settingsRepository.getSettings()
+            val metrics = engine.compute(offer, settings)
             overlay.show(OfferDisplay.from(offer, metrics))
+            if (settings.soundEnabled) sound.play(metrics.score)
         }
     }
 
@@ -164,6 +172,7 @@ class RideAccessibilityService : AccessibilityService() {
     private fun shutdown() {
         if (instance === this) instance = null
         overlay.hide()
+        sound.release()
         ActiveNotification.cancel(this)
         scope.cancel()
     }
