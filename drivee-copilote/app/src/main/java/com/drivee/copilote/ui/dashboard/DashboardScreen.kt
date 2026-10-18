@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.drivee.copilote.service.accessibility.ActiveNotification
+import com.drivee.copilote.service.accessibility.Diagnostics
 import com.drivee.copilote.service.accessibility.RideAccessibilityService
 import com.drivee.copilote.ui.onboarding.DisclosureBody
 import com.drivee.copilote.ui.onboarding.DisclosureText
@@ -59,8 +60,10 @@ fun DashboardScreen() {
     var batteryOk by remember { mutableStateOf(PermissionChecker.isIgnoringBatteryOptimizations(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
     var notifAskedOnce by remember { mutableStateOf(false) }
+    var diagSummary by remember { mutableStateOf(diagnosticSummary()) }
 
     fun refresh() {
+        diagSummary = diagnosticSummary()
         a11yEnabled = PermissionChecker.isAccessibilityEnabled(context)
         serviceRunning = RideAccessibilityService.isRunning
         notifOk = PermissionChecker.areNotificationsEnabled(context)
@@ -167,6 +170,36 @@ fun DashboardScreen() {
                 }) { Text("Afficher un exemple") }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "Diagnostic",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Si la pop-up n'apparaît pas sur une vraie offre : attendez une offre, revenez ici, puis partagez le diagnostic (textes lus à l'écran, rien n'est envoyé automatiquement).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    diagSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { refresh() }) { Text("Rafraîchir") }
+                    Button(onClick = { shareDiagnostic(context) }) { Text("Partager") }
+                }
+            }
+        }
     }
 
     // Divulgation (Prominent Disclosure) affichée AVANT toute redirection vers
@@ -228,6 +261,19 @@ private fun PermissionCard(
             }
         }
     }
+}
+
+private fun diagnosticSummary(): String =
+    "Service : ${if (RideAccessibilityService.isRunning) "actif" else "inactif"}\n" +
+        "Événements reçus : ${Diagnostics.eventSummary()}\n" +
+        "Dernier résultat : ${Diagnostics.lastResult}"
+
+private fun shareDiagnostic(context: Context) {
+    val send = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_SUBJECT, "Diagnostic Drivee Copilote")
+        .putExtra(Intent.EXTRA_TEXT, Diagnostics.report(RideAccessibilityService.isRunning))
+    runCatching { context.startActivity(Intent.createChooser(send, "Partager le diagnostic")) }
 }
 
 private fun openAccessibilitySettings(context: Context) {

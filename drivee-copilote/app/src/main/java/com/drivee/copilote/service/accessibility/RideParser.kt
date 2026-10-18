@@ -29,7 +29,7 @@ class RideParser @Inject constructor() {
 
     companion object {
         private const val TAG = "RideParser"
-        private const val MAX_NODES = 1500         // garde-fou perf
+        private const val MAX_NODES = 4000         // garde-fou perf (la carte peut contenir beaucoup de nœuds)
         private const val DEBUG_DUMP = false       // passer à true pour logger les textes
         private val NUMBER_REGEX = Regex("(\\d+(?:[.,]\\d{1,2})?)")
     }
@@ -39,6 +39,11 @@ class RideParser @Inject constructor() {
         val texts: MutableList<String> = mutableListOf(),
         val byViewId: MutableMap<String, String> = mutableMapOf()
     )
+
+    /** Textes lus lors de la dernière analyse (écran "Diagnostic" du tableau de bord). */
+    @Volatile
+    var lastTexts: List<String> = emptyList()
+        private set
 
     fun parse(root: AccessibilityNodeInfo?, pkg: String, config: ParserConfig): RideOffer? =
         if (root == null) null else parseRoots(listOf(root), pkg, config)
@@ -54,6 +59,7 @@ class RideParser @Inject constructor() {
                 .onFailure { Log.w(TAG, "Échec du parcours de l'arbre", it) }
                 .getOrNull()
         }
+        lastTexts = harvests.flatMap { it.texts }.take(120)
         if (harvests.isEmpty()) return null
         for (h in harvests) parseHarvest(h, pkg, config)?.let { return it }
         if (harvests.size == 1) return null

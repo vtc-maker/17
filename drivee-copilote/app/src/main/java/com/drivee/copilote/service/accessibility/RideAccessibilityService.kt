@@ -84,7 +84,12 @@ class RideAccessibilityService : AccessibilityService() {
         val pkg = event?.packageName?.toString() ?: return
         if (pkg !in Platforms.packages) return
 
-        analyzeJob?.cancel()
+        Diagnostics.onEvent(pkg)
+
+        // Throttle (et NON debounce) : la carte Uber/Bolt se rafraîchit en continu, un debounce
+        // serait relancé sans fin et l'écran ne serait jamais analysé. On analyse au plus
+        // toutes les 250 ms, en lisant l'écran au moment de l'analyse (état le plus récent).
+        if (analyzeJob?.isActive == true) return
         analyzeJob = scope.launch {
             delay(DEBOUNCE_MS)
             try {
@@ -101,6 +106,8 @@ class RideAccessibilityService : AccessibilityService() {
         val parsed = pkg?.let {
             parser.parseRoots(roots.filter { r -> r.packageName?.toString() == it }, it, settingsRepository.getParserConfig())
         }
+
+        Diagnostics.onAnalysis(pkg, roots.size, parser.lastTexts, parsed)
 
         if (parsed == null) {
             scheduleHide()

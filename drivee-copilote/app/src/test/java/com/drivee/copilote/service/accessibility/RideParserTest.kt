@@ -181,6 +181,24 @@ class RideParserTest {
     }
 
     @Test
+    fun `video Uber Nice-Monaco - approche avec duree, course avec seulement les km`() {
+        val texts = listOf(
+            "Comfort", "Exclusivité", "39,71 €", "4,81", "Montant net de frais",
+            "11 min (4.5 km)", "Terminal 1, Terminal 1 - D4, 06206, Nice",
+            "Course de 28.1 km", "52 Bd d'Italie, 98000, Monaco", "Accepter"
+        )
+
+        val offer = parser.parseTexts(texts, "com.ubercab.driver", config)
+
+        assertNotNull(offer)
+        assertEquals(39.71, offer!!.grossPriceEuros!!, 0.001)
+        assertEquals(4.5, offer.approachDistanceKm!!, 0.001)
+        assertEquals(11.0, offer.approachTimeMin!!, 0.001)
+        assertEquals(28.1, offer.rideDistanceKm!!, 0.001)
+        assertNull(offer.rideTimeMin)
+    }
+
+    @Test
     fun `les minutes ne sont pas lues comme des metres`() {
         val offer = parser.parseTexts(listOf("Accepter", "9,80 €", "3 min · 1,1 km", "15 min · 7,4 km"), "ee.mtakso.driver", config)
         assertEquals(8.5, offer!!.totalDistanceKm!!, 0.001)
