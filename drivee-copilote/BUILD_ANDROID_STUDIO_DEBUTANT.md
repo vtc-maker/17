@@ -1,4 +1,4 @@
-# 🚗 Drivee Copilote — Guide de build Android Studio (version débutant)
+# 🚗 VTC Copilot — Guide de build Android Studio (version débutant)
 
 Ce guide vous explique **pas à pas**, sans connaissance préalable, comment ouvrir le projet,
 le compiler et l'installer sur votre téléphone Android.
@@ -100,7 +100,7 @@ Le projet utilise **Java 17**. Android Studio en fournit un, il suffit de vérif
    - l'appareil : le nom de **votre téléphone**
 2. Cliquez sur le bouton vert **▶ Run 'app'** (ou `Maj + F10`).
 3. Patientez pendant la compilation (1 à 3 minutes la première fois).
-4. L'application **Drivee Copilote** s'ouvre automatiquement sur le téléphone. 🎉
+4. L'application **VTC Copilot** s'ouvre automatiquement sur le téléphone. 🎉
 
 ---
 
@@ -109,7 +109,7 @@ Le projet utilise **Java 17**. Android Studio en fournit un, il suffit de vérif
 L'écran d'accueil (Onboarding) vous guide :
 
 1. **Service d'accessibilité** — *Paramètres → Accessibilité → Applications installées →
-   « Drivee Copilote — Analyse d'offres » → Activer*.
+   « VTC Copilot — Analyse d'offres » → Activer*.
    C'est ce qui permet de lire les offres Uber/Bolt à l'écran.
 2. **Notifications** — bouton *Autoriser* du Tableau de bord (affiche « Drivee actif »).
 3. Vérifiez avec **Tableau de bord ▸ Tester la pop-up** : une offre d'exemple doit s'afficher en haut de l'écran.
@@ -117,7 +117,7 @@ L'écran d'accueil (Onboarding) vous guide :
 Conseillé : **désactiver l'optimisation de batterie** pour l'app (sinon Android peut la couper).
 
 > ⚠️ **Android 13/14 — « Paramètre restreint »** : si l'interrupteur Accessibilité est grisé,
-> allez dans *Paramètres → Applications → Drivee Copilote → ⋮ (menu en haut à droite) →
+> allez dans *Paramètres → Applications → VTC Copilot → ⋮ (menu en haut à droite) →
 > « Autoriser les paramètres restreints »*, puis réessayez. C'est normal pour une app installée hors Play Store.
 
 Ensuite : réglez vos **seuils rentables (€/km, €/h)** et vos coûts dans l'onglet *Réglages*,

@@ -92,7 +92,7 @@ fun OnboardingScreen(
             .padding(24.dp)
     ) {
         Text(
-            "Bienvenue sur Drivee Copilote",
+            "Bienvenue sur VTC Copilot",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground

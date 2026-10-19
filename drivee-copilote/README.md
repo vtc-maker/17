@@ -1,8 +1,8 @@
-# Drivee Copilote 🚕
+# VTC Copilot 🚕
 
 **Assistant de rentabilité pour chauffeurs VTC (Uber / Bolt / Heetch) — Android natif, Kotlin.**
 
-Drivee Copilote lit les offres de course affichées par Uber Driver, Bolt Driver ou Heetch Pro,
+VTC Copilot lit les offres de course affichées par Uber Driver, Bolt Driver ou Heetch Pro,
 calcule instantanément leur rentabilité (€/km, €/h) et affiche une **pop-up** en haut de l'écran
 avec un verdict **SUPER / MOYEN / MAUVAIS** et une jauge « seuil rentable ». Toutes les courses analysées
 sont historisées **localement** (aucun serveur, aucune donnée envoyée) pour produire des
@@ -177,7 +177,7 @@ Au premier démarrage, l'écran **Bienvenue** explique pourquoi l'app a besoin d
 
 | Permission | Obligatoire ? | Comment l'activer |
 |---|---|---|
-| **Service d'accessibilité** | ✅ Oui | Bouton *Activer* → confirmer la divulgation → Android ouvre *Paramètres ▸ Accessibilité* → trouver **Drivee Copilote — Analyse d'offres** → activer → *Autoriser*. |
+| **Service d'accessibilité** | ✅ Oui | Bouton *Activer* → confirmer la divulgation → Android ouvre *Paramètres ▸ Accessibilité* → trouver **VTC Copilot — Analyse d'offres** → activer → *Autoriser*. |
 | **Notifications** | Recommandé | Bouton *Autoriser* → affiche la notification *Drivee actif* tant que le service tourne. |
 | **Optimisation de la batterie** | Recommandé | Bouton *Configurer* → choisir *Ne pas optimiser* / *Autoriser*. Évite qu'Android coupe l'analyse en arrière-plan. |
 
@@ -229,7 +229,7 @@ Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confir
 
 ### 4.3 bis Bulle, pause et arrêt
 
-- **Bulle « D »** flottante (comme Uber/Bolt) : anneau **vert** = analyse active, **gris** = en pause. Un appui = pause / reprise, glisser = déplacer. Désactivable dans le Tableau de bord.
+- **Bulle (logo)** flottante (comme Uber/Bolt) : anneau **vert** = analyse active, **gris** = en pause. Un appui = pause / reprise, glisser = déplacer. Désactivable dans le Tableau de bord.
 - **Notification** *Drivee actif* : boutons **Pause / Reprendre** et **Arrêter** (arrêt complet du service ; à réactiver ensuite dans *Accessibilité*).
 - **Lecture des offres** : d'abord les textes d'accessibilité, puis, si l'app VTC les masque (cas constaté sur Uber), **lecture de l'écran par OCR embarqué** (ML Kit, hors ligne, Android 11+, 1 capture/s max, la pop-up et la bulle sont exclues).
 - **Diagnostic** (Tableau de bord) : résultat de la lecture par NŒUDS et par OCR + bouton Partager.
@@ -252,7 +252,7 @@ Appuyez sur **Enregistrer** — un message *✓ Paramètres enregistrés* confir
 
 ### 4.6 Arrêter l'analyse
 
-Désactivez le service dans *Paramètres ▸ Accessibilité ▸ Drivee Copilote*. La notification et la pop-up
+Désactivez le service dans *Paramètres ▸ Accessibilité ▸ VTC Copilot*. La notification et la pop-up
 disparaissent immédiatement. Vos données restent dans l'Historique.
 
 ---
@@ -441,6 +441,6 @@ Logs utiles (Logcat) : `RideA11yService`, `RideParser`, `OfferOverlay`.
 
 ## Licence & responsabilité
 
-Projet fourni « tel quel ». Drivee Copilote n'est affilié ni à Uber ni à Bolt. L'utilisateur reste seul
+Projet fourni « tel quel ». VTC Copilot n'est affilié ni à Uber ni à Bolt. L'utilisateur reste seul
 responsable du respect des conditions d'utilisation des plateformes et du Code de la route : **ne manipulez
 jamais votre téléphone en conduisant**.

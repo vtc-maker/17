@@ -18,7 +18,7 @@ object WeeklySummary {
     private val FILE_FMT = SimpleDateFormat("yyyyMMdd", Locale.FRANCE)
 
     fun buildText(state: StatsUiState): String = buildString {
-        appendLine("Récap Drivee — semaine ${state.weekRangeLabel}")
+        appendLine("Récap VTC Copilot — semaine ${state.weekRangeLabel}")
         appendLine("──────────────────────────")
         appendLine("Courses : ${state.weekRideCount}")
         appendLine("Revenu net : ${euro(state.weekTotalNet)}")
@@ -30,7 +30,7 @@ object WeeklySummary {
             appendLine("• ${d.label} : ${euro(d.netRevenue)} (${d.rideCount} course(s))")
         }
         appendLine()
-        appendLine("Généré par Drivee Copilote.")
+        appendLine("Généré par VTC Copilot.")
     }
 
     /**
@@ -41,14 +41,14 @@ object WeeklySummary {
         if (state.currentWeekRides.isEmpty()) return null
 
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, "drivee_semaine_${FILE_FMT.format(Date())}.csv")
+        val file = File(dir, "vtc_copilot_semaine_${FILE_FMT.format(Date())}.csv")
         file.writeText(CsvExporter.buildCsv(state.currentWeekRides), Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
-            putExtra(Intent.EXTRA_SUBJECT, "Récap Drivee — semaine ${state.weekRangeLabel}")
+            putExtra(Intent.EXTRA_SUBJECT, "Récap VTC Copilot — semaine ${state.weekRangeLabel}")
             putExtra(Intent.EXTRA_TEXT, buildText(state))
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

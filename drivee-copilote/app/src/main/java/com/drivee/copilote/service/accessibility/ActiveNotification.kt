@@ -16,7 +16,7 @@ import com.drivee.copilote.R
 import com.drivee.copilote.ui.MainActivity
 
 /**
- * Notification discrète "Drivee actif — Analyse des offres en cours…",
+ * Notification discrète "VTC Copilot actif — Analyse des offres en cours…",
  * affichée tant que le service d'accessibilité tourne.
  */
 object ActiveNotification {
@@ -31,7 +31,7 @@ object ActiveNotification {
             val channel = NotificationChannel(
                 CHANNEL_ID, "Analyse des offres", NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Indique que Drivee analyse les offres Uber, Bolt et Heetch."
+                description = "Indique que VTC Copilot analyse les offres Uber, Bolt et Heetch."
                 setShowBadge(false)
             }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -56,7 +56,7 @@ object ActiveNotification {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(if (paused) "Drivee en pause" else "Drivee actif")
+            .setContentTitle(if (paused) "VTC Copilot en pause" else "VTC Copilot actif")
             .setContentText(if (paused) "Analyse suspendue — touchez Reprendre" else "Analyse des offres en cours…")
             .addAction(0, if (paused) "Reprendre" else "Pause", action(ACTION_TOGGLE_PAUSE, 1))
             .addAction(0, "Arrêter", action(ACTION_STOP, 2))

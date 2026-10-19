@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Drivee Copilote</string>
-    <string name="accessibility_service_label">Drivee Copilote — Analyse d\'offres</string>
+    <string name="app_name">VTC Copilot</string>
+    <string name="accessibility_service_label">VTC Copilot — Analyse d\'offres</string>
     <string name="accessibility_service_description">
-        Drivee Copilote lit les propositions de course affichées par votre application VTC
+        VTC Copilot lit les propositions de course affichées par votre application VTC
         (Uber, Bolt, Heetch) afin de calculer instantanément leur rentabilité (€/km, €/h) et de
         l\'afficher dans une petite pop-up. L\'objectif est de vous aider à décider en une
         seconde, sans manipuler votre téléphone en conduisant. Aucune donnée d\'écran n\'est

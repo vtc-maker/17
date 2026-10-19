@@ -71,7 +71,7 @@ object CsvExporter {
         if (rides.isEmpty()) return null
 
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, "drivee_courses_${FILE_FMT.format(Date())}.csv")
+        val file = File(dir, "vtc_copilot_courses_${FILE_FMT.format(Date())}.csv")
         file.writeText(buildCsv(rides), Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(
@@ -83,7 +83,7 @@ object CsvExporter {
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Export des courses Drivee")
+            putExtra(Intent.EXTRA_SUBJECT, "Export des courses VTC Copilot")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

@@ -26,7 +26,7 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Bulle flottante « D » (comme celles d'Uber / Bolt) indiquant que Drivee tourne.
+ * Bulle flottante (logo VTC Copilot) (comme celles d'Uber / Bolt) indiquant que VTC Copilot tourne.
  *  - analyse active : anneau coloré qui « respire » (halo lumineux pulsé, effet Bolt)
  *  - en pause : anneau gris, immobile
  *  - un appui = ouvrir l'application ; glisser = déplacer
@@ -115,7 +115,7 @@ class FloatingBubble(private val context: Context, private val onTap: () -> Unit
     private fun dpi(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, context.resources.displayMetrics).roundToInt()
 
-    /** Vue dessinée : halo pulsé + anneau + disque sombre + « D ». */
+    /** Vue dessinée : halo pulsé + anneau + disque sombre + logo. */
     private class BubbleView(context: Context) : View(context) {
 
         companion object {
@@ -190,9 +190,22 @@ class FloatingBubble(private val context: Context, private val onTap: () -> Unit
             ringPaint.strokeWidth = dp(3f) + dp(1f) * phase
             canvas.drawCircle(cx, cy, coreR - ringPaint.strokeWidth / 2f, ringPaint)
 
-            val baseline = cy - (textPaint.descent() + textPaint.ascent()) / 2f
-            canvas.drawText("D", cx, baseline, textPaint)
+            // Logo VTC Copilot (rond) à l'intérieur de l'anneau, sinon « V » en secours.
+            val logoR = coreR - ringPaint.strokeWidth - dp(1f)
+            val bmp = logo
+            if (bmp != null) {
+                logoRect.set((cx - logoR).toInt(), (cy - logoR).toInt(), (cx + logoR).toInt(), (cy + logoR).toInt())
+                canvas.drawBitmap(bmp, null, logoRect, bitmapPaint)
+            } else {
+                val baseline = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+                canvas.drawText("V", cx, baseline, textPaint)
+            }
         }
+
+        private val logo: android.graphics.Bitmap? =
+            runCatching { android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo) }.getOrNull()
+        private val logoRect = Rect()
+        private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
         private fun withAlpha(c: Int, a: Float) =
             Color.argb((a.coerceIn(0f, 1f) * 255).toInt(), Color.red(c), Color.green(c), Color.blue(c))

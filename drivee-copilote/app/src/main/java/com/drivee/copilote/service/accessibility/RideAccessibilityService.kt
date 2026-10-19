@@ -160,7 +160,7 @@ class RideAccessibilityService : AccessibilityService() {
         val paused = !ServiceState.isPaused(this)
         ServiceState.setPaused(this, paused)
         applyState()
-        Toast.makeText(this, if (paused) "Drivee en pause" else "Drivee actif", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, if (paused) "VTC Copilot en pause" else "VTC Copilot actif", Toast.LENGTH_SHORT).show()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

@@ -98,7 +98,7 @@ fun DashboardScreen() {
             .padding(20.dp)
     ) {
         Text(
-            text = "Drivee Copilote",
+            text = "VTC Copilot",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -126,7 +126,7 @@ fun DashboardScreen() {
                     }
                     SwitchRow(
                         title = "Bulle flottante",
-                        subtitle = "Pastille « D » à l'écran : un appui = pause / reprise",
+                        subtitle = "Logo VTC Copilot à l'écran : un appui ouvre l'app",
                         checked = bubbleOn
                     ) { on ->
                         RideAccessibilityService.setBubbleEnabled(context, on)
@@ -157,7 +157,7 @@ fun DashboardScreen() {
 
         PermissionCard(
             title = "Notifications",
-            description = "Affiche la notification « Drivee actif » pour savoir d'un coup d'œil que l'analyse tourne.",
+            description = "Affiche la notification « VTC Copilot actif » pour savoir d'un coup d'œil que l'analyse tourne.",
             granted = notifOk,
             actionLabel = if (notifOk) "Autorisé" else "Autoriser",
             onClick = {
@@ -174,7 +174,7 @@ fun DashboardScreen() {
 
         PermissionCard(
             title = "Optimisation de la batterie",
-            description = "Recommandé : exclure Drivee de l'optimisation pour que l'analyse reste active en arrière-plan.",
+            description = "Recommandé : exclure VTC Copilot de l'optimisation pour que l'analyse reste active en arrière-plan.",
             granted = batteryOk,
             actionLabel = if (batteryOk) "Exclu" else "Configurer",
             onClick = { openBatterySettings(context) }
@@ -317,7 +317,7 @@ private fun diagnosticSummary(): String =
 private fun shareDiagnostic(context: Context) {
     val send = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
-        .putExtra(Intent.EXTRA_SUBJECT, "Diagnostic Drivee Copilote")
+        .putExtra(Intent.EXTRA_SUBJECT, "Diagnostic VTC Copilot")
         .putExtra(Intent.EXTRA_TEXT, Diagnostics.report(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported))
     runCatching { context.startActivity(Intent.createChooser(send, "Partager le diagnostic")) }
 }

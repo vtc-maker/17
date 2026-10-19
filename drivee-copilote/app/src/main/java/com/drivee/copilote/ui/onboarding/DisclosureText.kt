@@ -7,10 +7,10 @@ package com.drivee.copilote.ui.onboarding
  */
 object DisclosureText {
 
-    const val TITLE = "Drivee utilise le service d'accessibilité"
+    const val TITLE = "VTC Copilot utilise le service d'accessibilité"
 
     const val INTRO =
-        "Pour vous aider à décider en une seconde si une course est rentable, Drivee Copilote " +
+        "Pour vous aider à décider en une seconde si une course est rentable, VTC Copilot " +
             "a besoin de lire à l'écran les informations de l'offre affichée par votre " +
             "application VTC (Uber, Bolt, Heetch) : prix proposé, distances et durées d'approche et de " +
             "course, zones de départ et de destination."

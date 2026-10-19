@@ -20,6 +20,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
@@ -177,6 +178,12 @@ class OfferOverlay(private val context: Context) {
         perKmTv = text(bigSp, TEXT)
         priceTv = text(bigSp + 2f, TEXT)
         hourlyTv = text(bigSp, TEXT)
+        // Logo VTC Copilot (aligné sur la ligne de base des chiffres).
+        val logo = ImageView(context).apply {
+            setImageResource(R.drawable.app_logo)
+            baselineAlignBottom = true
+        }
+        row.addView(logo, LinearLayout.LayoutParams(dpi(22f), dpi(22f)).apply { rightMargin = dpi(6f) })
         row.addView(platformTv)
         row.addView(perKmTv)
         row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))

@@ -61,7 +61,7 @@ object Diagnostics {
             "Dernière décision : ${lastDecision ?: "—"}"
 
     fun report(serviceRunning: Boolean, ocrSupported: Boolean): String = buildString {
-        appendLine("Drivee Copilote — diagnostic")
+        appendLine("VTC Copilot — diagnostic")
         appendLine(summary(serviceRunning, ocrSupported))
         listOf("OFFRE (Accepter visible)" to lastOfferLike, "NŒUDS" to lastNodes, "OCR" to lastOcr).forEach { (title, c) ->
             appendLine()
