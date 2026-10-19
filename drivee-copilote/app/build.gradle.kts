@@ -38,6 +38,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // Compatibilité pages mémoire 16 KB (Android 15+ / Google Play) :
+    // les .so ML Kit sont déjà compilés en 16 KB (ELF LOAD align = 16384), mais AGP 8.2
+    // ne les aligne pas sur 16 KB dans le zip de l'APK. En les stockant compressés
+    // (extraits à l'installation), aucun alignement zip n'est requis → avertissement levé.
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
 }
 
 dependencies {
