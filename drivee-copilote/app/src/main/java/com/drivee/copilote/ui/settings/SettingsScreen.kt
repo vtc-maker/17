@@ -149,6 +149,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Switch(checked = priceIsNet, onCheckedChange = { priceIsNet = it })
         }
 
+        Spacer(Modifier.height(16.dp))
+        ColorsSection()
+
         Spacer(Modifier.height(24.dp))
         Button(
             modifier = Modifier.fillMaxWidth(),

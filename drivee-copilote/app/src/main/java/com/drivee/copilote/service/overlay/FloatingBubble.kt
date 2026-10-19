@@ -1,11 +1,16 @@
 package com.drivee.copilote.service.overlay
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RadialGradient
 import android.graphics.Rect
+import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -14,42 +19,41 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.TextView
+import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.content.res.ResourcesCompat
 import com.drivee.copilote.R
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Bulle flottante (comme celles d'Uber / Bolt) indiquant que Drivee tourne.
- *  - anneau vert = analyse active, gris = en pause
- *  - un appui = pause / reprise ; glisser = déplacer
+ * Bulle flottante « D » (comme celles d'Uber / Bolt) indiquant que Drivee tourne.
+ *  - analyse active : anneau coloré qui « respire » (halo lumineux pulsé, effet Bolt)
+ *  - en pause : anneau gris, immobile
+ *  - un appui = ouvrir l'application ; glisser = déplacer
  */
 class FloatingBubble(private val context: Context, private val onTap: () -> Unit) {
 
-    companion object {
-        private const val ACTIVE = 0xFF4ADE80.toInt()
-        private const val PAUSED = 0xFF6B7280.toInt()
-        private const val BG = 0xF2111513.toInt()
-    }
-
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val main = Handler(Looper.getMainLooper())
-    private var view: TextView? = null
+    private var view: BubbleView? = null
     private var params: WindowManager.LayoutParams? = null
 
-    fun show(active: Boolean) {
+    /** [ringColor] = couleur de l'anneau (réglages), utilisée si [active]. */
+    fun show(active: Boolean, ringColor: Int) {
         main.post {
             runCatching {
                 if (view == null) attach()
-                paint(active)
+                view?.setState(active, ringColor)
             }
         }
     }
 
     fun hide() {
         main.post {
-            view?.let { v -> runCatching { wm.removeViewImmediate(v) } }
+            view?.let { v ->
+                v.stop()
+                runCatching { wm.removeViewImmediate(v) }
+            }
             view = null
         }
     }
@@ -62,17 +66,9 @@ class FloatingBubble(private val context: Context, private val onTap: () -> Unit
     }
 
     private fun attach() {
-        val size = dpi(54f)
+        val size = dpi(76f)
         val metrics = context.resources.displayMetrics
-        val v = TextView(context).apply {
-            text = "D"
-            gravity = Gravity.CENTER
-            setTextColor(0xFFF2F4F5.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            typeface = runCatching { ResourcesCompat.getFont(context, R.font.jetbrains_mono_medium) }.getOrNull()
-                ?.let { Typeface.create(it, Typeface.BOLD) } ?: Typeface.MONOSPACE
-            elevation = dp(6f)
-        }
+        val v = BubbleView(context)
         val p = WindowManager.LayoutParams(
             size, size,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -82,22 +78,13 @@ class FloatingBubble(private val context: Context, private val onTap: () -> Unit
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = metrics.widthPixels - size - dpi(8f)
+            x = metrics.widthPixels - size
             y = (metrics.heightPixels * 0.38f).roundToInt()
         }
         enableDragAndTap(v, p)
         wm.addView(v, p)
         view = v
         params = p
-    }
-
-    private fun paint(active: Boolean) {
-        view?.background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(BG)
-            setStroke(dpi(3f), if (active) ACTIVE else PAUSED)
-        }
-        view?.alpha = if (active) 1f else 0.7f
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -125,6 +112,91 @@ class FloatingBubble(private val context: Context, private val onTap: () -> Unit
         }
     }
 
-    private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, context.resources.displayMetrics)
-    private fun dpi(v: Float) = dp(v).roundToInt()
+    private fun dpi(v: Float) =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, context.resources.displayMetrics).roundToInt()
+
+    /** Vue dessinée : halo pulsé + anneau + disque sombre + « D ». */
+    private class BubbleView(context: Context) : View(context) {
+
+        companion object {
+            private const val BG = 0xF2111513.toInt()
+            private const val PAUSED = 0xFF6B7280.toInt()
+            private const val BREATH_MS = 1_400L
+        }
+
+        private var active = true
+        private var ringColor = 0xFF4ADE80.toInt()
+        private var phase = 0f // 0 → 1 → 0 (respiration)
+
+        private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+        private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BG }
+        private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFF2F4F5.toInt()
+            textAlign = Paint.Align.CENTER
+            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 22f, resources.displayMetrics)
+            typeface = runCatching { ResourcesCompat.getFont(context, R.font.jetbrains_mono_medium) }.getOrNull()
+                ?.let { Typeface.create(it, Typeface.BOLD) } ?: Typeface.MONOSPACE
+        }
+
+        private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = BREATH_MS
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { phase = it.animatedValue as Float; invalidate() }
+        }
+
+        fun setState(active: Boolean, ringColor: Int) {
+            this.active = active
+            this.ringColor = ringColor
+            if (active) {
+                if (!animator.isStarted) animator.start()
+            } else {
+                animator.cancel()
+                phase = 0f
+            }
+            alpha = if (active) 1f else 0.75f
+            invalidate()
+        }
+
+        fun stop() = animator.cancel()
+
+        override fun onDetachedFromWindow() {
+            animator.cancel()
+            super.onDetachedFromWindow()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val cx = width / 2f
+            val cy = height / 2f
+            val coreR = dp(25f)
+            val color = if (active) ringColor else PAUSED
+
+            if (active) {
+                // Halo qui respire : rayon et intensité pulsés.
+                val haloR = coreR + dp(5f) + dp(8f) * phase
+                haloPaint.shader = RadialGradient(
+                    cx, cy, haloR,
+                    intArrayOf(withAlpha(color, 0.55f + 0.25f * phase), withAlpha(color, 0.25f * (1f - phase)), Color.TRANSPARENT),
+                    floatArrayOf(coreR / haloR, 0.8f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawCircle(cx, cy, haloR, haloPaint)
+            }
+
+            canvas.drawCircle(cx, cy, coreR, corePaint)
+            ringPaint.color = if (active) withAlpha(color, 0.75f + 0.25f * phase) else color
+            ringPaint.strokeWidth = dp(3f) + dp(1f) * phase
+            canvas.drawCircle(cx, cy, coreR - ringPaint.strokeWidth / 2f, ringPaint)
+
+            val baseline = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+            canvas.drawText("D", cx, baseline, textPaint)
+        }
+
+        private fun withAlpha(c: Int, a: Float) =
+            Color.argb((a.coerceIn(0f, 1f) * 255).toInt(), Color.red(c), Color.green(c), Color.blue(c))
+
+        private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
+    }
 }

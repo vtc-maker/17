@@ -23,6 +23,12 @@ object Diagnostics {
     /** Dernière capture (nœuds ou OCR) où un bouton Accepter/Refuser était visible. */
     @Volatile var lastOfferLike: Capture? = null; private set
     @Volatile var lastDetected: String? = null; private set
+    @Volatile var lastDecision: String? = null; private set
+
+    fun onDecision(offer: RideOffer, decision: String) {
+        val label = if (decision == "ACCEPTED") "ACCEPTÉE (enregistrée)" else "non acceptée (ignorée)"
+        lastDecision = "${time(System.currentTimeMillis())} ${offer.grossPriceEuros} € → $label"
+    }
 
     @Synchronized
     fun onEvent(pkg: String) {
@@ -51,7 +57,8 @@ object Diagnostics {
             "Événements reçus : ${eventSummary()}\n" +
             "Nœuds : ${lastNodes?.result ?: "—"}\n" +
             "OCR : ${lastOcr?.result ?: "—"}\n" +
-            "Dernière offre détectée : ${lastDetected ?: "aucune"}"
+            "Dernière offre détectée : ${lastDetected ?: "aucune"}\n" +
+            "Dernière décision : ${lastDecision ?: "—"}"
 
     fun report(serviceRunning: Boolean, ocrSupported: Boolean): String = buildString {
         appendLine("Drivee Copilote — diagnostic")

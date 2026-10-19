@@ -12,6 +12,9 @@ interface RideDao {
     @Insert
     suspend fun insert(ride: RideEntity): Long
 
+    @Query("DELETE FROM rides")
+    suspend fun deleteAll()
+
     /** Historique complet, du plus récent au plus ancien. */
     @Query("SELECT * FROM rides ORDER BY capturedAtEpochMs DESC")
     fun observeAll(): Flow<List<RideEntity>>

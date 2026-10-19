@@ -24,7 +24,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import com.drivee.copilote.R
-import com.drivee.copilote.domain.model.ProfitabilityScore
+import com.drivee.copilote.data.prefs.AppColors
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -57,13 +57,6 @@ class OfferOverlay(private val context: Context) {
         private const val STROKE = 0x26FFFFFF
         private const val TEXT = 0xFFF2F4F5.toInt()
         private const val TEXT_SOFT = 0xFFE3E6E8.toInt()
-
-        fun colorFor(score: ProfitabilityScore): Int = when (score) {
-            ProfitabilityScore.GREEN -> 0xFF4ADE80.toInt()
-            ProfitabilityScore.ORANGE -> 0xFFF5A524.toInt()
-            ProfitabilityScore.RED -> 0xFFF26B6B.toInt()
-            ProfitabilityScore.UNKNOWN -> 0xFF9AA4B2.toInt()
-        }
     }
 
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -212,7 +205,7 @@ class OfferOverlay(private val context: Context) {
     }
 
     private fun bind(d: OfferDisplay) {
-        val color = colorFor(d.score)
+        val color = AppColors.forScore(context, d.score)
 
         platformTv.text = d.platform
         perKmTv.text = withUnit(d.perKm?.let { fmt("%.2f€", it) } ?: "—", "/km")

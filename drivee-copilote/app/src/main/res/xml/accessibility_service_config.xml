@@ -27,7 +27,7 @@
     notificationTimeout : anti-rebond. 100 ms évite de traiter chaque micro-changement.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeWindowsChanged|typeViewClicked"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagDefault"
     android:canRetrieveWindowContent="true"

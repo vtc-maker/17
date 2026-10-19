@@ -1,5 +1,6 @@
 package com.drivee.copilote.ui.history
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,14 +17,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,9 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivee.copilote.data.local.entity.RideEntity
-import com.drivee.copilote.ui.theme.ScoreGreen
-import com.drivee.copilote.ui.theme.ScoreOrange
-import com.drivee.copilote.ui.theme.ScoreRed
+import com.drivee.copilote.data.prefs.AppColors
 import com.drivee.copilote.ui.theme.ScoreUnknown
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,6 +53,19 @@ import java.util.Locale
 fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var confirmClear by remember { mutableStateOf(false) }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Effacer l'historique ?") },
+            text = { Text("Toutes les courses enregistrées seront supprimées.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearAll(); confirmClear = false }) { Text("Effacer") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Annuler") } }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -78,8 +94,18 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                         }
                     }
                 }
-            ) { Text("Exporter CSV") }
+            ) { Text("CSV") }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                enabled = state.rides.isNotEmpty(),
+                onClick = { confirmClear = true }
+            ) { Text("Effacer") }
         }
+        Text(
+            "Seules les courses acceptées sont enregistrées.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(12.dp))
 
         // Filtres.
@@ -139,6 +165,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
 @Composable
 private fun RideRow(ride: RideEntity) {
     val dateFmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE) }
+    val context = LocalContext.current
     Card(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -149,7 +176,7 @@ private fun RideRow(ride: RideEntity) {
                 Modifier
                     .size(14.dp)
                     .clip(CircleShape)
-                    .background(scoreColor(ride.score))
+                    .background(scoreColor(context, ride.score))
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -196,9 +223,9 @@ private fun RideEntity.totalLabel(): String? {
     return String.format(Locale.FRANCE, "%.1f km · %.0f min", km, min)
 }
 
-private fun scoreColor(score: String): Color = when (score) {
-    "GREEN" -> ScoreGreen
-    "ORANGE" -> ScoreOrange
-    "RED" -> ScoreRed
+private fun scoreColor(context: Context, score: String): Color = when (score) {
+    "GREEN" -> Color(AppColors.get(context, AppColors.Slot.SUPER))
+    "ORANGE" -> Color(AppColors.get(context, AppColors.Slot.MOYEN))
+    "RED" -> Color(AppColors.get(context, AppColors.Slot.MAUVAIS))
     else -> ScoreUnknown
 }

@@ -33,6 +33,8 @@ class RideRepository @Inject constructor(
         return rideDao.insert(entity)
     }
 
+    suspend fun clearAll() = rideDao.deleteAll()
+
     fun observeAll(): Flow<List<RideEntity>> = rideDao.observeAll()
 
     fun observeBetween(fromMs: Long, toMs: Long): Flow<List<RideEntity>> =

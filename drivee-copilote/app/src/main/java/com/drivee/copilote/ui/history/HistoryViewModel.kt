@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -56,6 +57,8 @@ class HistoryViewModel @Inject constructor(
         )
 
     fun setFilter(f: HistoryFilter) { filter.value = f }
+
+    fun clearAll() { viewModelScope.launch { repository.clearAll() } }
 
     private fun HistoryFilter.range(): Pair<Long, Long> {
         // Borne haute ouverte : les courses enregistrées APRÈS le choix du filtre

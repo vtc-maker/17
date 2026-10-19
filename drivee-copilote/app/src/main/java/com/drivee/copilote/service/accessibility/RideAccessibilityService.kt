@@ -10,15 +10,18 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import com.drivee.copilote.data.prefs.AppColors
 import com.drivee.copilote.data.repository.RideRepository
 import com.drivee.copilote.data.repository.SettingsRepository
 import com.drivee.copilote.domain.engine.ProfitabilityEngine
+import com.drivee.copilote.domain.model.ProfitabilityMetrics
 import com.drivee.copilote.domain.model.Platforms
 import com.drivee.copilote.domain.model.RideOffer
 import com.drivee.copilote.service.overlay.FloatingBubble
 import com.drivee.copilote.service.overlay.OfferDisplay
 import com.drivee.copilote.service.overlay.OfferOverlay
 import com.drivee.copilote.service.overlay.VerdictSound
+import com.drivee.copilote.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,11 +56,14 @@ class RideAccessibilityService : AccessibilityService() {
     private val overlay by lazy { OfferOverlay(this) }
     private val sound by lazy { VerdictSound(this) }
     private val ocr by lazy { ScreenOcr(this) }
-    private val bubble by lazy { FloatingBubble(this) { togglePause() } }
+    private val bubble by lazy { FloatingBubble(this) { openApp() } }
+    /** Historique : seules les offres ACCEPTÉES sont enregistrées. */
+    private val acceptance = AcceptanceTracker<Pair<RideOffer, ProfitabilityMetrics>>()
 
     private var analyzeJob: Job? = null
     private var hideJob: Job? = null
     private var lastOfferSignature: String? = null
+    private var lastItem: Pair<RideOffer, ProfitabilityMetrics>? = null
     @Volatile private var lastEventPkg: String? = null
     private var demoIndex = 0
 
@@ -97,6 +103,11 @@ class RideAccessibilityService : AccessibilityService() {
             instance?.applyState()
         }
 
+        /** À appeler après un changement de couleurs dans les réglages. */
+        fun refreshAppearance() {
+            instance?.applyState()
+        }
+
         /** Arrête complètement le service (il faudra le réactiver dans Accessibilité). */
         fun stop(): Boolean {
             val service = instance ?: return false
@@ -127,8 +138,22 @@ class RideAccessibilityService : AccessibilityService() {
             overlay.hide()
             lastOfferSignature = null
         }
-        if (ServiceState.isBubbleEnabled(this)) bubble.show(active = !paused) else bubble.hide()
+        if (ServiceState.isBubbleEnabled(this)) {
+            bubble.show(active = !paused, ringColor = AppColors.get(this, AppColors.Slot.BUBBLE))
+        } else {
+            bubble.hide()
+        }
         ActiveNotification.show(this, paused)
+    }
+
+    /** Appui sur la bulle : ouvre Drivee (pause / arrêt se font dans l'app). */
+    private fun openApp() {
+        runCatching {
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            )
+        }.onFailure { Log.w(TAG, "Ouverture de l'app impossible", it) }
     }
 
     private fun togglePause() {
@@ -144,6 +169,16 @@ class RideAccessibilityService : AccessibilityService() {
         Diagnostics.onEvent(pkg)
         if (ServiceState.isPaused(this)) return
         lastEventPkg = pkg
+
+        // Clic sur "Accepter" / "Refuser" (si l'app VTC l'expose) : décision immédiate.
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            val clicked = buildString {
+                event.text?.forEach { append(it).append(' ') }
+                event.contentDescription?.let { append(it) }
+            }
+            acceptance.onClick(clicked)?.let { record(it) }
+            return
+        }
 
         if (analyzeJob?.isActive == true) return
         analyzeJob = scope.launch {
@@ -167,14 +202,22 @@ class RideAccessibilityService : AccessibilityService() {
         Diagnostics.onAnalysis("NŒUDS", pkg, roots.size, parser.lastTexts, parsed)
 
         // 2) Plan B : OCR de l'écran (nos propres fenêtres exclues).
+        var screenTexts: List<String> = parser.lastTexts
         if (parsed == null) {
             val lines = ocr.readLines(listOfNotNull(overlay.visibleRect(), bubble.visibleRect()))
-                ?: return // capture trop récente : on ne décide rien, prochaine analyse dans 250 ms
+            if (lines == null) {
+                // capture trop récente : on ne décide rien, prochaine analyse dans 250 ms
+                acceptance.onScreen(screenTexts)?.let { record(it) }
+                return
+            }
             parsed = parser.parseTexts(lines, pkg, config)
             Diagnostics.onAnalysis("OCR", pkg, roots.size, lines, parsed)
+            screenTexts = screenTexts + lines
         }
 
         if (parsed == null) {
+            acceptance.offerGone()
+            acceptance.onScreen(screenTexts)?.let { record(it) }
             scheduleHide()
             return
         }
@@ -183,7 +226,10 @@ class RideAccessibilityService : AccessibilityService() {
 
         // Déduplication (prix seul : l'OCR peut lire les km légèrement différemment d'une image à l'autre).
         val signature = "${parsed.sourcePackage}|${parsed.grossPriceEuros}"
-        if (signature == lastOfferSignature) return
+        if (signature == lastOfferSignature) {
+            lastItem?.let { acceptance.offerVisible(signature, it) } // toujours à l'écran
+            return
+        }
         lastOfferSignature = signature
 
         val settings = settingsRepository.getSettings()
@@ -192,8 +238,20 @@ class RideAccessibilityService : AccessibilityService() {
         overlay.show(OfferDisplay.from(offer, metrics))
         if (settings.soundEnabled) sound.play(metrics.score)
 
-        runCatching { rideRepository.save(offer, metrics) }
-            .onFailure { Log.w(TAG, "Échec sauvegarde course", it) }
+        val item = offer to metrics
+        lastItem = item
+        acceptance.offerVisible(signature, item)?.let { record(it) }
+    }
+
+    /** Enregistre la décision : seules les courses ACCEPTÉES vont dans l'historique. */
+    private fun record(result: AcceptanceTracker.Result<Pair<RideOffer, ProfitabilityMetrics>>) {
+        val (offer, metrics) = result.item
+        Diagnostics.onDecision(offer, result.decision.name)
+        if (result.decision != AcceptanceTracker.Decision.ACCEPTED) return
+        scope.launch {
+            runCatching { rideRepository.save(offer, metrics) }
+                .onFailure { Log.w(TAG, "Échec sauvegarde course", it) }
+        }
     }
 
     /** Racines des fenêtres des apps VTC, la plus haute d'abord. */
