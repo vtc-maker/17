@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -267,10 +268,25 @@ class RideAccessibilityService : AccessibilityService() {
             }
     }.getOrDefault(false)
 
+    /**
+     * Fenêtres des apps VTC à analyser, la plus pertinente d'abord :
+     *  1. la fenêtre d'application active (l'app VTC au premier plan),
+     *  2. puis les plus grandes (carte d'offre affichée par-dessus le menu du téléphone).
+     * Les petites fenêtres (ex : bulle flottante "Uber" visible pendant qu'on est sur Bolt)
+     * sont ignorées : sinon une offre Bolt était attribuée à Uber et lue avec les règles Uber.
+     */
     private fun collectRoots(): List<AccessibilityNodeInfo> {
+        val minWidth = resources.displayMetrics.widthPixels * 0.4
         val fromWindows = runCatching {
-            windows.mapNotNull { it.root }
-                .filter { it.packageName?.toString() in Platforms.packages }
+            windows.mapNotNull { w ->
+                val root = w.root ?: return@mapNotNull null
+                if (root.packageName?.toString() !in Platforms.packages) return@mapNotNull null
+                val b = Rect().also { w.getBoundsInScreen(it) }
+                if (b.width() < minWidth) return@mapNotNull null // bulle flottante d'une autre app VTC
+                val active = w.type == AccessibilityWindowInfo.TYPE_APPLICATION && (w.isActive || w.isFocused)
+                Triple(root, active, b.width().toLong() * b.height())
+            }.sortedWith(compareByDescending<Triple<AccessibilityNodeInfo, Boolean, Long>> { it.second }.thenByDescending { it.third })
+                .map { it.first }
         }.getOrDefault(emptyList())
         if (fromWindows.isNotEmpty()) return fromWindows
         return listOfNotNull(rootInActiveWindow?.takeIf { it.packageName?.toString() in Platforms.packages })
