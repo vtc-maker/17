@@ -2,7 +2,9 @@ package com.drivee.copilote.ui.history
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,23 +35,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivee.copilote.data.local.entity.RideEntity
+import com.drivee.copilote.data.local.entity.RideStatus
 import com.drivee.copilote.data.prefs.AppColors
+import com.drivee.copilote.ui.common.PeriodBar
+import com.drivee.copilote.ui.common.platformName
+import com.drivee.copilote.ui.common.rideScore100
+import com.drivee.copilote.ui.common.totalKm
 import com.drivee.copilote.ui.theme.ScoreUnknown
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * Écran "Historique" : liste des courses scannées, filtre par date,
- * rentabilité horaire nette MOYENNE sur la période.
+ * "Votre historique" : courses à valider (Pris ✓ / Pas pris), onglets Courses prises / Pas prises,
+ * filtre de période. Chaque offre scannée est sauvegardée avec son statut.
  */
 @Composable
 fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
@@ -67,160 +77,193 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Historique",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            OutlinedButton(
-                enabled = state.rides.isNotEmpty(),
-                onClick = {
-                    CsvExporter.createShareIntent(context, state.rides)?.let { intent ->
-                        runCatching {
-                            context.startActivity(
-                                Intent.createChooser(intent, "Exporter les courses (CSV)")
-                            )
+        item {
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Votre historique",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "${state.takenCount} course(s) prise(s) · ${state.pending.size} en attente",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(
+                    enabled = state.rides.isNotEmpty(),
+                    onClick = {
+                        CsvExporter.createShareIntent(context, state.rides)?.let { intent ->
+                            runCatching { context.startActivity(Intent.createChooser(intent, "Exporter (CSV)")) }
                         }
                     }
+                ) { Text("CSV") }
+                TextButton(onClick = { confirmClear = true }) { Text("Effacer") }
+            }
+        }
+
+        // ---- À valider ----
+        if (state.pending.isNotEmpty()) {
+            item { SectionTitle("À valider", state.pending.size, Color(0xFFF5A524)) }
+            items(state.pending, key = { "p${it.id}" }) { ride ->
+                RideCard(ride, highlight = null) {
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = { viewModel.setStatus(ride.id, RideStatus.REJECTED) }
+                        ) { Text("Pas pris") }
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(AppColors.get(context, AppColors.Slot.SUPER)),
+                                contentColor = Color.Black
+                            ),
+                            onClick = { viewModel.setStatus(ride.id, RideStatus.ACCEPTED) }
+                        ) { Text("Pris ✓", fontWeight = FontWeight.Bold) }
+                    }
                 }
-            ) { Text("CSV") }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(
-                enabled = state.rides.isNotEmpty(),
-                onClick = { confirmClear = true }
-            ) { Text("Effacer") }
-        }
-        Text(
-            "Seules les courses acceptées sont enregistrées.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-
-        // Filtres.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HistoryFilter.entries.forEach { f ->
-                FilterChip(
-                    selected = state.filter == f,
-                    onClick = { viewModel.setFilter(f) },
-                    label = { Text(f.label) }
-                )
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        // Résumé moyenne.
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    "Rentabilité horaire nette moyenne",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = state.averageNetHourly?.let {
-                        String.format(Locale.FRANCE, "%.1f €/h", it)
-                    } ?: "—",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    "${state.rides.size} course(s) sur la période",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        // ---- Onglets + période ----
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HistoryTab.entries.forEach { tab ->
+                    val selected = state.tab == tab
+                    val accent = if (tab == HistoryTab.TAKEN) Color(AppColors.get(context, AppColors.Slot.SUPER))
+                    else Color(AppColors.get(context, AppColors.Slot.MAUVAIS))
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, if (selected) accent else MaterialTheme.colorScheme.outline),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (selected) accent.copy(alpha = 0.12f) else Color.Transparent,
+                            contentColor = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        onClick = { viewModel.setTab(tab) }
+                    ) { Text(tab.label) }
+                }
             }
+            Spacer(Modifier.height(10.dp))
+            PeriodBar(state.period, viewModel::setPeriod, viewModel::setCustomRange)
         }
 
-        Spacer(Modifier.height(12.dp))
+        item {
+            val taken = state.tab == HistoryTab.TAKEN
+            SectionTitle(
+                if (taken) "Courses prises" else "Pas prises",
+                if (taken) state.takenCount else state.notTakenCount,
+                Color(AppColors.get(context, if (taken) AppColors.Slot.SUPER else AppColors.Slot.MAUVAIS))
+            )
+        }
 
         if (state.rides.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "Aucune course enregistrée.\nActivez l'analyse depuis le tableau de bord.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("Aucune course sur cette période.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.rides, key = { it.id }) { ride -> RideRow(ride) }
+            items(state.rides, key = { it.id }) { ride ->
+                RideCard(ride, highlight = if (state.tab == HistoryTab.NOT_TAKEN) "Pas pris" else null)
             }
         }
+        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
 @Composable
-private fun RideRow(ride: RideEntity) {
-    val dateFmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE) }
+private fun SectionTitle(title: String, count: Int, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+        Box(Modifier.width(3.dp).height(20.dp).background(color, RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(10.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            count.toString(),
+            color = color,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.background(color.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)
+        )
+    }
+}
+
+/** Carte d'une course : badge note, verdict (ou "Pas pris"), plateforme, km · €/km, prix, heure. */
+@Composable
+private fun RideCard(ride: RideEntity, highlight: String?, extra: (@Composable () -> Unit)? = null) {
     val context = LocalContext.current
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Pastille de score.
-            Box(
-                Modifier
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(scoreColor(context, ride.score))
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = ride.grossPriceEuros?.let {
-                        String.format(Locale.FRANCE, "%.2f €", it)
-                    } ?: "—",
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = buildString {
-                        ride.netPricePerKmEuros?.let {
-                            append(String.format(Locale.FRANCE, "%.2f €/km net", it))
-                        }
-                        ride.totalLabel()?.let { append(" · ").append(it) }
-                    }.ifBlank { "Détails indisponibles" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    val timeFmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE) }
+    val color = scoreColor(context, ride.score)
+    val title = highlight ?: verdictLabel(ride.score)
+    val km = totalKm(ride.approachDistanceKm, ride.rideDistanceKm)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(46.dp).border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .background(color.copy(alpha = 0.10f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(rideScore100(ride.thresholdRatio)?.toString() ?: "—", color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(title, color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            platformName(ride.sourcePackage),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(
+                        buildString {
+                            append(String.format(Locale.US, "%.1f km", km))
+                            ride.grossPricePerKmEuros?.let { append("  ·  ").append(String.format(Locale.FRANCE, "%.2f €/km", it)) }
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        ride.grossPriceEuros?.let { String.format(Locale.FRANCE, "%.2f €", it) } ?: "—",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        timeFmt.format(Date(ride.capturedAtEpochMs)),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = ride.netHourlyRateEuros?.let {
-                        String.format(Locale.FRANCE, "%.1f €/h", it)
-                    } ?: "—",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = dateFmt.format(Date(ride.capturedAtEpochMs)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            extra?.invoke()
         }
     }
 }
 
-private fun RideEntity.totalLabel(): String? {
-    val km = (approachDistanceKm ?: 0.0) + (rideDistanceKm ?: 0.0)
-    val min = (approachTimeMin ?: 0.0) + (rideTimeMin ?: 0.0)
-    if (km <= 0.0 && min <= 0.0) return null
-    return String.format(Locale.FRANCE, "%.1f km · %.0f min", km, min)
+private fun verdictLabel(score: String) = when (score) {
+    "GREEN" -> "Super"
+    "ORANGE" -> "Moyen"
+    "RED" -> "Mauvais"
+    else -> "—"
 }
 
 private fun scoreColor(context: Context, score: String): Color = when (score) {

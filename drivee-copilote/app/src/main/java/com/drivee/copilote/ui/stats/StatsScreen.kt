@@ -1,219 +1,170 @@
 package com.drivee.copilote.ui.stats
 
-import android.content.Intent
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.drivee.copilote.ui.theme.AmberAccent
-import com.drivee.copilote.ui.theme.ScoreGreen
+import com.drivee.copilote.data.prefs.AppColors
+import com.drivee.copilote.ui.common.Period
+import com.drivee.copilote.ui.common.PeriodBar
 import java.util.Locale
 
-/**
- * Écran "Statistiques" : graphes de revenu net par jour (semaine en cours) et par
- * semaine (6 dernières), + récap hebdo partageable en un tap.
- */
+/** "Vos statistiques" : moyennes, qualité des courses, revenus par plateforme (courses prises). */
 @Composable
 fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val superC = Color(AppColors.get(context, AppColors.Slot.SUPER))
+    val moyenC = Color(AppColors.get(context, AppColors.Slot.MOYEN))
+    val mauvaisC = Color(AppColors.get(context, AppColors.Slot.MAUVAIS))
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "Statistiques",
+            "Vos statistiques",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Semaine ${state.weekRangeLabel}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        PeriodBar(state.period, viewModel::setPeriod, viewModel::setCustomRange)
 
-        Spacer(Modifier.height(16.dp))
-
-        // Résumé de la semaine.
+        Section("Vos moyennes")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard("Montant moyen", state.averageAmount?.let { String.format(Locale.FRANCE, "%.2f €", it) } ?: "—", Modifier.weight(1f))
+            StatCard("Taux moyen", state.averagePerKm?.let { String.format(Locale.FRANCE, "%.2f €/km", it) } ?: "—", Modifier.weight(1f))
+        }
         Card(Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StatBox("Revenu net", String.format(Locale.FRANCE, "%.0f €", state.weekTotalNet))
-                StatBox("Courses", state.weekRideCount.toString())
-                StatBox(
-                    "Moyenne",
-                    state.weekAvgHourly?.let { String.format(Locale.FRANCE, "%.1f €/h", it) } ?: "—"
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Distance totale", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    String.format(Locale.US, "%.1f", state.totalDistanceKm),
+                    fontFamily = FontFamily.Monospace, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface
                 )
+                Text(" km", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Section("Qualité des courses")
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Row(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                    listOf(state.superPct to superC, state.moyenPct to moyenC, state.mauvaisPct to mauvaisC).forEach { (pct, c) ->
+                        if (pct > 0) Box(Modifier.weight(pct.toFloat()).fillMaxHeight().background(c))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Legend("Super ${state.superPct}%", superC)
+                    Legend("Moyen ${state.moyenPct}%", moyenC)
+                    Legend("Mauvais ${state.mauvaisPct}%", mauvaisC)
+                }
+            }
+        }
 
-        // Graphe : revenu net par jour (semaine en cours).
-        Text(
-            "Revenu net par jour",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+        Section(
+            when (state.period) {
+                Period.TODAY -> "Vos revenus par plateforme aujourd'hui"
+                Period.WEEK -> "Vos revenus par plateforme cette semaine"
+                Period.MONTH -> "Vos revenus par plateforme ce mois-ci"
+                else -> "Vos revenus par plateforme"
+            }
         )
-        Spacer(Modifier.height(8.dp))
-        BarChart(
-            values = state.currentWeekDays.map { it.netRevenue.toFloat() },
-            labels = state.currentWeekDays.map { it.label.take(3) },
-            barColor = AmberAccent
-        )
+        Card(Modifier.fillMaxWidth().border(1.dp, superC.copy(alpha = 0.6f), RoundedCornerShape(16.dp)), shape = RoundedCornerShape(16.dp)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.platforms.isEmpty()) {
+                    Text("Aucune course prise sur cette période.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                state.platforms.forEachIndexed { i, p ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${i + 1}", color = if (i == 0) superC else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(Modifier.width(16.dp))
+                        Text(p.name, Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("${p.rideCount} courses", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            String.format(Locale.FRANCE, "%.0f €", p.revenue),
+                            fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            color = if (i == 0) superC else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Total CA", Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("${state.rides.size} courses", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(16.dp))
+                    Text(String.format(Locale.FRANCE, "%.0f €", state.totalRevenue), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
 
-        Spacer(Modifier.height(24.dp))
-
-        // Graphe : revenu net par semaine (6 dernières).
-        Text(
-            "Revenu net par semaine",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(8.dp))
-        BarChart(
-            values = state.recentWeeks.map { it.netRevenue.toFloat() },
-            labels = state.recentWeeks.map { it.label },
-            barColor = ScoreGreen
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Button(
+        OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
-            enabled = state.currentWeekRides.isNotEmpty(),
+            enabled = state.rides.isNotEmpty(),
             onClick = {
                 WeeklySummary.buildShareIntent(context, state)?.let { intent ->
-                    runCatching {
-                        context.startActivity(
-                            Intent.createChooser(intent, "Partager le récap hebdomadaire")
-                        )
-                    }
+                    runCatching { context.startActivity(android.content.Intent.createChooser(intent, "Partager le récap")) }
                 }
             }
-        ) { Text("Partager le récap hebdo") }
-
-        Spacer(Modifier.height(24.dp))
+        ) { Text("Partager le récap (texte + CSV)") }
     }
 }
 
 @Composable
-private fun StatBox(label: String, value: String) {
-    Column {
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun Section(title: String) {
+    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/**
- * Graphe à barres minimaliste dessiné au Canvas (aucune dépendance externe).
- * Étiquettes affichées sous le graphe via une Row alignée.
- */
 @Composable
-private fun BarChart(
-    values: List<Float>,
-    labels: List<String>,
-    barColor: Color
-) {
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val gridColor = MaterialTheme.colorScheme.outline
-    val maxValue = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
-
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-            ) {
-                drawBars(values, maxValue, barColor, gridColor)
-            }
+private fun StatCard(label: String, value: String, modifier: Modifier) {
+    Card(modifier) {
+        Column(Modifier.padding(16.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                labels.forEach { l ->
-                    Box(Modifier.padding(horizontal = 2.dp)) {
-                        Text(
-                            l,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = labelColor
-                        )
-                    }
-                }
-            }
+            Text(value, fontFamily = FontFamily.Monospace, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
         }
     }
 }
 
-private fun DrawScope.drawBars(
-    values: List<Float>,
-    maxValue: Float,
-    barColor: Color,
-    gridColor: Color
-) {
-    if (values.isEmpty()) return
-    val count = values.size
-    val slot = size.width / count
-    val barWidth = slot * 0.55f
-    val bottom = size.height
-
-    // Ligne de base.
-    drawLine(
-        color = gridColor,
-        start = Offset(0f, bottom),
-        end = Offset(size.width, bottom),
-        strokeWidth = 2f
-    )
-
-    values.forEachIndexed { i, v ->
-        // Un revenu net négatif (course à perte) est tracé à 0 : pas de barre inversée.
-        val h = (v.coerceAtLeast(0f) / maxValue) * (size.height * 0.9f)
-        val left = i * slot + (slot - barWidth) / 2f
-        drawRoundRect(
-            color = barColor,
-            topLeft = Offset(left, bottom - h),
-            size = androidx.compose.ui.geometry.Size(barWidth, h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
-        )
+@Composable
+private fun Legend(label: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

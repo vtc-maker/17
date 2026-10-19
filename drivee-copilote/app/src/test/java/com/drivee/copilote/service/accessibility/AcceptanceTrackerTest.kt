@@ -32,11 +32,11 @@ class AcceptanceTrackerTest {
     }
 
     @Test
-    fun `sans preuve apres 30 s = REFUSEE`() {
+    fun `sans preuve apres 30 s = A VALIDER`() {
         tracker.offerVisible("a", "A")
         tracker.offerGone()
         now = 31_000
-        assertEquals(Decision.REJECTED, tracker.onScreen(listOf("carte"))!!.decision)
+        assertEquals(Decision.PENDING, tracker.onScreen(listOf("carte"))!!.decision)
     }
 
     @Test
@@ -53,12 +53,19 @@ class AcceptanceTrackerTest {
     }
 
     @Test
-    fun `nouvelle offre pendant l'attente = la precedente est refusee`() {
+    fun `nouvelle offre pendant l'attente = la precedente est a valider`() {
         tracker.offerVisible("a", "A")
         tracker.offerGone()
         val r = tracker.offerVisible("b", "B")!!
         assertEquals("A", r.item)
-        assertEquals(Decision.REJECTED, r.decision)
+        assertEquals(Decision.PENDING, r.decision)
+    }
+
+    @Test
+    fun `lecture remplacee alors que l'offre est visible = ignoree`() {
+        tracker.offerVisible("a99", "mauvaise lecture")
+        assertNull(tracker.offerVisible("a12", "bonne lecture"))
+        assertEquals("bonne lecture", tracker.onClick("Accepter")!!.item)
     }
 
     @Test

@@ -3,77 +3,66 @@ package com.drivee.copilote.ui.history
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drivee.copilote.data.local.entity.RideEntity
+import com.drivee.copilote.data.local.entity.RideStatus
 import com.drivee.copilote.data.repository.RideRepository
+import com.drivee.copilote.ui.common.Period
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import javax.inject.Inject
 
-/** Filtres temporels proposés dans l'historique. */
-enum class HistoryFilter(val label: String) {
-    TODAY("Aujourd'hui"),
-    WEEK("7 jours"),
-    ALL("Tout")
-}
+/** Onglets de l'historique. */
+enum class HistoryTab(val label: String) { TAKEN("Courses prises"), NOT_TAKEN("Pas prises") }
 
 data class HistoryUiState(
-    val rides: List<RideEntity> = emptyList(),
-    val averageNetHourly: Double? = null,
-    val filter: HistoryFilter = HistoryFilter.TODAY
+    val pending: List<RideEntity> = emptyList(),
+    val rides: List<RideEntity> = emptyList(),   // liste de l'onglet courant, sur la période
+    val takenCount: Int = 0,
+    val notTakenCount: Int = 0,
+    val tab: HistoryTab = HistoryTab.TAKEN,
+    val period: Period = Period.WEEK
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+private data class Filters(val period: Period, val from: Long?, val to: Long?, val tab: HistoryTab)
+
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val repository: RideRepository
 ) : ViewModel() {
 
-    private val filter = MutableStateFlow(HistoryFilter.TODAY)
-
-    private val ridesFlow = filter.flatMapLatest { f ->
-        val (from, to) = f.range()
-        repository.observeBetween(from, to)
-    }
-
-    private val avgFlow = filter.flatMapLatest { f ->
-        val (from, to) = f.range()
-        repository.observeAverageNetHourly(from, to)
-    }
+    private val filters = MutableStateFlow(Filters(Period.WEEK, null, null, HistoryTab.TAKEN))
 
     val uiState: StateFlow<HistoryUiState> =
-        combine(ridesFlow, avgFlow, filter) { rides, avg, f ->
-            HistoryUiState(rides = rides, averageNetHourly = avg, filter = f)
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            HistoryUiState()
-        )
+        combine(repository.observeAll(), filters) { all, f ->
+            val (from, to) = f.period.range(f.from, f.to)
+            val inPeriod = all.filter { it.capturedAtEpochMs in from until to }
+            val taken = inPeriod.filter { it.status == RideStatus.ACCEPTED }
+            val notTaken = inPeriod.filter { it.status == RideStatus.REJECTED }
+            HistoryUiState(
+                // Les courses "à valider" restent visibles quelle que soit la période.
+                pending = all.filter { it.status == RideStatus.PENDING },
+                rides = if (f.tab == HistoryTab.TAKEN) taken else notTaken,
+                takenCount = taken.size,
+                notTakenCount = notTaken.size,
+                tab = f.tab,
+                period = f.period
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 
-    fun setFilter(f: HistoryFilter) { filter.value = f }
+    fun setPeriod(p: Period) { filters.value = filters.value.copy(period = p) }
 
-    fun clearAll() { viewModelScope.launch { repository.clearAll() } }
-
-    private fun HistoryFilter.range(): Pair<Long, Long> {
-        // Borne haute ouverte : les courses enregistrées APRÈS le choix du filtre
-        // doivent apparaître en direct (le Flow Room se met à jour tout seul).
-        return when (this) {
-            HistoryFilter.ALL -> 0L to Long.MAX_VALUE
-            HistoryFilter.TODAY -> startOfToday() to Long.MAX_VALUE
-            HistoryFilter.WEEK -> (System.currentTimeMillis() - 7L * 24 * 3600 * 1000) to Long.MAX_VALUE
-        }
+    fun setCustomRange(from: Long, to: Long) {
+        filters.value = filters.value.copy(period = Period.CUSTOM, from = from, to = to)
     }
 
-    private fun startOfToday(): Long = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    fun setTab(t: HistoryTab) { filters.value = filters.value.copy(tab = t) }
+
+    /** Validation manuelle d'une course "à valider" (Pris ✓ / Pas pris). */
+    fun setStatus(id: Long, status: String) { viewModelScope.launch { repository.updateStatus(id, status) } }
+
+    fun clearAll() { viewModelScope.launch { repository.clearAll() } }
 }

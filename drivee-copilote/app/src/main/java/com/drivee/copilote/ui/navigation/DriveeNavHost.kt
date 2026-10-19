@@ -2,6 +2,8 @@ package com.drivee.copilote.ui.navigation
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
@@ -9,6 +11,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -21,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -78,7 +83,15 @@ private fun MainScaffold() {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            Column {
+                Text(
+                    "Made by Faucobingo",
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                NavigationBar {
                 tabs.forEach { dest ->
                     val selected = currentRoute?.hierarchy?.any { it.route == dest.route } == true
                     NavigationBarItem(
@@ -94,6 +107,7 @@ private fun MainScaffold() {
                         label = { Text(dest.label) }
                     )
                 }
+            }
             }
         }
     ) { padding ->

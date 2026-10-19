@@ -15,6 +15,9 @@ interface RideDao {
     @Query("DELETE FROM rides")
     suspend fun deleteAll()
 
+    @Query("UPDATE rides SET status = :status WHERE id = :id")
+    suspend fun updateStatus(id: Long, status: String)
+
     /** Historique complet, du plus récent au plus ancien. */
     @Query("SELECT * FROM rides ORDER BY capturedAtEpochMs DESC")
     fun observeAll(): Flow<List<RideEntity>>

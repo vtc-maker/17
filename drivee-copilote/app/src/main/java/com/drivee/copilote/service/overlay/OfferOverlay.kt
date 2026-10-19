@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.Layout
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.RelativeSizeSpan
@@ -79,6 +80,8 @@ class OfferOverlay(private val context: Context) {
     private lateinit var hourlyTv: TextView
     private lateinit var tripTv: TextView
     private lateinit var gauge: GaugeView
+    private var bigSp = 26f
+    private var rowAvailablePx = 0
 
     fun show(d: OfferDisplay) {
         main.post {
@@ -168,7 +171,9 @@ class OfferOverlay(private val context: Context) {
 
         // Taille des gros chiffres adaptée à la largeur de l'écran.
         val widthDp = windowW / context.resources.displayMetrics.density
-        val bigSp = (widthDp / 13f).coerceIn(20f, 32f)
+        bigSp = (widthDp / 13f).coerceIn(20f, 32f)
+        // Largeur utile de la 1re ligne = fenêtre − marges extérieures (2×6dp) − marges du contenu (2×18dp).
+        rowAvailablePx = windowW - dpi(12f) - dpi(36f)
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -224,6 +229,7 @@ class OfferOverlay(private val context: Context) {
             d.minutes?.let { (if (d.timeEstimated) "~" else "") + "${it.roundToInt()} min" },
             d.km?.let { "${formatKm(it)} km" }
         ).joinToString(" · ")
+        fitFirstRow()
 
         accent.background = GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
@@ -267,6 +273,29 @@ class OfferOverlay(private val context: Context) {
                 else -> false
             }
         }
+    }
+
+    /**
+     * Réduit les chiffres si la 1re ligne (logo + plateforme + €/km + prix + €/h) dépasse
+     * la largeur de la carte : sinon le €/h, dernier élément, était coupé ("27" au lieu de "27€/h").
+     */
+    private fun fitFirstRow() {
+        if (rowAvailablePx <= 0) return
+        fun apply(f: Float) {
+            platformTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f * f)
+            perKmTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, bigSp * f)
+            priceTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, (bigSp + 2f) * f)
+            hourlyTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, bigSp * f)
+        }
+        fun needed(): Float =
+            dp(22f + 6f + 8f + 16f) + // logo + marge + padding plateforme + espace mini entre blocs
+                listOf(platformTv, perKmTv, priceTv, hourlyTv).sumOf {
+                    Layout.getDesiredWidth(it.text, it.paint).toDouble()
+                }.toFloat()
+
+        apply(1f)
+        val need = needed()
+        if (need > rowAvailablePx) apply((rowAvailablePx / need) * 0.97f)
     }
 
     // ------------------------------------------------------------------

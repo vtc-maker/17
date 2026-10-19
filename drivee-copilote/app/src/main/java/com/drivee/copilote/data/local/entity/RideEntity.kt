@@ -22,5 +22,16 @@ data class RideEntity(
     val netPricePerKmEuros: Double?,
     val grossPricePerKmEuros: Double?,
     val netProfitEuros: Double?,
-    val score: String
+    val score: String,
+    /** ACCEPTED (prise) · REJECTED (pas prise) · PENDING (à valider par le chauffeur). */
+    val status: String = RideStatus.ACCEPTED,
+    val grossHourlyRateEuros: Double? = null,
+    /** Position par rapport au seuil rentable (1.0 = pile au seuil). */
+    val thresholdRatio: Double? = null
 )
+
+object RideStatus {
+    const val ACCEPTED = "ACCEPTED"
+    const val REJECTED = "REJECTED"
+    const val PENDING = "PENDING"
+}

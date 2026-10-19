@@ -9,7 +9,7 @@ package com.drivee.copilote.service.accessibility
  *  2. après la disparition de l'offre, l'écran suivant :
  *     - écran de prise en charge ("Récupérer", "Je suis arrivé", "Commencer la course"…) → ACCEPTÉE
  *     - retour à l'attente ("Vous êtes en ligne", "Passer hors ligne"…) → REFUSÉE
- *  3. aucune preuve d'acceptation après [timeoutMs] → REFUSÉE (ou ignorée / expirée).
+ *  3. aucune preuve après [timeoutMs], ou nouvelle offre entre-temps → À VALIDER (le chauffeur tranche).
  *
  * Même offre ré-affichée (lecture momentanément ratée) = pas une nouvelle offre.
  * Une offre déjà décidée n'est jamais comptée deux fois.
@@ -19,7 +19,7 @@ class AcceptanceTracker<T>(
     private val timeoutMs: Long = 30_000L,
     private val idleGraceMs: Long = 2_500L
 ) {
-    enum class Decision { ACCEPTED, REJECTED }
+    enum class Decision { ACCEPTED, REJECTED, PENDING }
 
     data class Result<T>(val item: T, val decision: Decision)
 
@@ -48,7 +48,10 @@ class AcceptanceTracker<T>(
         )
     }
 
-    /** Une offre est visible à l'écran. Renvoie l'éventuelle offre précédente, considérée refusée. */
+    /**
+     * Une offre est visible à l'écran. L'offre précédente déjà disparue sans preuve → À VALIDER.
+     * Une offre encore "visible" remplacée par une autre lecture = mauvaise lecture → ignorée.
+     */
     @Synchronized
     fun offerVisible(key: String, item: T): Result<T>? {
         if (key in decidedKeys) return null
@@ -59,10 +62,10 @@ class AcceptanceTracker<T>(
             awaiting = null
             return null
         }
-        val previous = aw ?: current
+        current?.let { decide(it, Decision.REJECTED) } // ancienne lecture remplacée : ignorée
         awaiting = null
         current = Slot(key, item)
-        return previous?.let { decide(it, Decision.REJECTED) }
+        return aw?.let { decide(it, Decision.PENDING) }
     }
 
     /** L'offre n'est plus lue à l'écran : on attend l'écran suivant pour décider. */
@@ -96,7 +99,7 @@ class AcceptanceTracker<T>(
         val decision = when {
             ACCEPTED_SCREEN.containsMatchIn(joined) -> Decision.ACCEPTED
             elapsed >= idleGraceMs && IDLE_SCREEN.containsMatchIn(joined) -> Decision.REJECTED
-            elapsed >= timeoutMs -> Decision.REJECTED
+            elapsed >= timeoutMs -> Decision.PENDING
             else -> return null
         }
         awaiting = null

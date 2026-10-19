@@ -26,7 +26,11 @@ object Diagnostics {
     @Volatile var lastDecision: String? = null; private set
 
     fun onDecision(offer: RideOffer, decision: String) {
-        val label = if (decision == "ACCEPTED") "ACCEPTÉE (enregistrée)" else "non acceptée (ignorée)"
+        val label = when (decision) {
+            "ACCEPTED" -> "PRISE"
+            "PENDING" -> "À VALIDER"
+            else -> "PAS PRISE"
+        }
         lastDecision = "${time(System.currentTimeMillis())} ${offer.grossPriceEuros} € → $label"
     }
 

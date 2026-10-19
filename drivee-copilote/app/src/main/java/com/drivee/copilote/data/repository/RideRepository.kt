@@ -2,6 +2,7 @@ package com.drivee.copilote.data.repository
 
 import com.drivee.copilote.data.local.dao.RideDao
 import com.drivee.copilote.data.local.entity.RideEntity
+import com.drivee.copilote.data.local.entity.RideStatus
 import com.drivee.copilote.domain.model.ProfitabilityMetrics
 import com.drivee.copilote.domain.model.RideOffer
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +14,7 @@ import javax.inject.Singleton
 class RideRepository @Inject constructor(
     private val rideDao: RideDao
 ) {
-    suspend fun save(offer: RideOffer, metrics: ProfitabilityMetrics): Long {
+    suspend fun save(offer: RideOffer, metrics: ProfitabilityMetrics, status: String = RideStatus.ACCEPTED): Long {
         val entity = RideEntity(
             sourcePackage = offer.sourcePackage,
             capturedAtEpochMs = offer.capturedAtEpochMs,
@@ -28,12 +29,17 @@ class RideRepository @Inject constructor(
             netPricePerKmEuros = metrics.netPricePerKmEuros,
             grossPricePerKmEuros = metrics.grossPricePerKmEuros,
             netProfitEuros = metrics.netProfitEuros,
-            score = metrics.score.name
+            score = metrics.score.name,
+            status = status,
+            grossHourlyRateEuros = metrics.grossHourlyRateEuros,
+            thresholdRatio = metrics.thresholdRatio
         )
         return rideDao.insert(entity)
     }
 
     suspend fun clearAll() = rideDao.deleteAll()
+
+    suspend fun updateStatus(id: Long, status: String) = rideDao.updateStatus(id, status)
 
     fun observeAll(): Flow<List<RideEntity>> = rideDao.observeAll()
 

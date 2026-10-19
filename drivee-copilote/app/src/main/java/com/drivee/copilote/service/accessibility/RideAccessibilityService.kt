@@ -243,13 +243,12 @@ class RideAccessibilityService : AccessibilityService() {
         acceptance.offerVisible(signature, item)?.let { record(it) }
     }
 
-    /** Enregistre la décision : seules les courses ACCEPTÉES vont dans l'historique. */
+    /** Enregistre la décision dans l'historique : prise, pas prise ou à valider. */
     private fun record(result: AcceptanceTracker.Result<Pair<RideOffer, ProfitabilityMetrics>>) {
         val (offer, metrics) = result.item
         Diagnostics.onDecision(offer, result.decision.name)
-        if (result.decision != AcceptanceTracker.Decision.ACCEPTED) return
         scope.launch {
-            runCatching { rideRepository.save(offer, metrics) }
+            runCatching { rideRepository.save(offer, metrics, result.decision.name) }
                 .onFailure { Log.w(TAG, "Échec sauvegarde course", it) }
         }
     }
