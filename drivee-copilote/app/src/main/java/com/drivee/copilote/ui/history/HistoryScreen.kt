@@ -2,6 +2,9 @@ package com.drivee.copilote.ui.history
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,6 +68,19 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     val context = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
 
+    // Import d'une sauvegarde CSV (sélecteur de fichiers Android, aucune permission requise).
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.bufferedReader(Charsets.UTF_8).readText() }
+        }.getOrNull()
+        if (text == null) {
+            Toast.makeText(context, "Fichier illisible", Toast.LENGTH_LONG).show()
+        } else {
+            viewModel.importCsv(text) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
+        }
+    }
+
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -105,6 +121,9 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                         }
                     }
                 ) { Text("CSV") }
+                TextButton(onClick = {
+                    importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel", "application/octet-stream"))
+                }) { Text("Importer") }
                 TextButton(onClick = { confirmClear = true }) { Text("Effacer") }
             }
         }

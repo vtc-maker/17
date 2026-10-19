@@ -32,7 +32,30 @@ object Diagnostics {
             else -> "PAS PRISE"
         }
         lastDecision = "${time(System.currentTimeMillis())} ${offer.grossPriceEuros} € → $label"
+        log("Décision : ${offer.grossPriceEuros} € → $label")
     }
+
+    /** Journal chronologique (200 dernières lignes), inclus dans le fichier partagé. */
+    private val journal = ArrayDeque<String>()
+
+    @Synchronized
+    fun log(message: String) {
+        journal.addLast("${time(System.currentTimeMillis())} $message")
+        while (journal.size > 200) journal.removeFirst()
+    }
+
+    @Synchronized
+    private fun journalLines(): List<String> = journal.toList()
+
+    /**
+     * Résumé affiché à l'écran : uniquement des compteurs et heures, AUCUN prix / km / "Accepter",
+     * pour que l'OCR ne puisse jamais prendre l'écran de VTC Copilot pour une offre.
+     */
+    fun shortSummary(serviceRunning: Boolean, ocrSupported: Boolean): String =
+        "Service : ${if (serviceRunning) "actif" else "inactif"} · OCR : ${if (ocrSupported) "oui" else "non (Android < 11)"}\n" +
+            "Événements reçus : ${eventSummary()}\n" +
+            "Dernière analyse : ${(lastOcr ?: lastNodes)?.let { time(it.at) } ?: "—"}\n" +
+            "Lignes dans le journal : ${journalLines().size}"
 
     @Synchronized
     fun onEvent(pkg: String) {
@@ -53,7 +76,10 @@ object Diagnostics {
         val capture = Capture(System.currentTimeMillis(), pkg, windows, texts, "$source : $result")
         if (source == "OCR") lastOcr = capture else lastNodes = capture
         if (texts.any { anchor.containsMatchIn(it) }) lastOfferLike = capture
-        if (offer != null) lastDetected = "${time(capture.at)} ${capture.result}"
+        if (offer != null && lastDetected != "${time(capture.at)} ${capture.result}") {
+            lastDetected = "${time(capture.at)} ${capture.result}"
+            log("Détection ${capture.result}")
+        }
     }
 
     fun summary(serviceRunning: Boolean, ocrSupported: Boolean): String =
@@ -72,6 +98,9 @@ object Diagnostics {
             appendLine("--- $title ${c?.let { "${time(it.at)} · ${it.windows} fenêtre(s) · ${it.result}" } ?: "—"} ---")
             c?.texts?.forEach { appendLine(it) }
         }
+        appendLine()
+        appendLine("--- JOURNAL ---")
+        journalLines().forEach { appendLine(it) }
     }
 
     private fun time(ms: Long) = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date(ms))

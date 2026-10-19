@@ -15,6 +15,12 @@ interface RideDao {
     @Query("DELETE FROM rides")
     suspend fun deleteAll()
 
+    @Insert
+    suspend fun insertAll(rides: List<RideEntity>)
+
+    @Query("SELECT * FROM rides")
+    suspend fun getAll(): List<RideEntity>
+
     @Query("UPDATE rides SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
 

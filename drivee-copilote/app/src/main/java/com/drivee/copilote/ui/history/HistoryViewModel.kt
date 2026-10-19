@@ -65,4 +65,18 @@ class HistoryViewModel @Inject constructor(
     fun setStatus(id: Long, status: String) { viewModelScope.launch { repository.updateStatus(id, status) } }
 
     fun clearAll() { viewModelScope.launch { repository.clearAll() } }
+
+    /** Importe une sauvegarde CSV (format de l'export VTC Copilot). */
+    fun importCsv(text: String, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = CsvImporter.parse(text)
+            val added = runCatching { repository.importRides(result.rides) }.getOrDefault(0)
+            val dup = result.rides.size - added
+            onDone(
+                "$added course(s) importée(s)" +
+                    (if (dup > 0) " · $dup déjà présente(s)" else "") +
+                    (if (result.skipped > 0) " · ${result.skipped} ligne(s) illisible(s)" else "")
+            )
+        }
+    }
 }

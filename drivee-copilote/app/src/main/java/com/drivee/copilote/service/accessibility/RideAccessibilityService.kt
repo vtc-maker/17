@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.drivee.copilote.data.prefs.AppColors
@@ -204,6 +205,8 @@ class RideAccessibilityService : AccessibilityService() {
         // 2) Plan B : OCR de l'écran (nos propres fenêtres exclues).
         var screenTexts: List<String> = parser.lastTexts
         if (parsed == null) {
+            // Ne JAMAIS relire notre propre app (ex : journal de diagnostic affiché à l'écran).
+            if (isOwnAppInForeground()) return
             val lines = ocr.readLines(listOfNotNull(overlay.visibleRect(), bubble.visibleRect()))
             if (lines == null) {
                 // capture trop récente : on ne décide rien, prochaine analyse dans 250 ms
@@ -254,6 +257,16 @@ class RideAccessibilityService : AccessibilityService() {
     }
 
     /** Racines des fenêtres des apps VTC, la plus haute d'abord. */
+    /** Vrai si l'app au premier plan est VTC Copilot elle-même (l'OCR la lirait comme une offre). */
+    private fun isOwnAppInForeground(): Boolean = runCatching {
+        val own = packageName
+        rootInActiveWindow?.packageName?.toString() == own ||
+            windows.any { w ->
+                w.type == AccessibilityWindowInfo.TYPE_APPLICATION && (w.isActive || w.isFocused) &&
+                    w.root?.packageName?.toString() == own
+            }
+    }.getOrDefault(false)
+
     private fun collectRoots(): List<AccessibilityNodeInfo> {
         val fromWindows = runCatching {
             windows.mapNotNull { it.root }

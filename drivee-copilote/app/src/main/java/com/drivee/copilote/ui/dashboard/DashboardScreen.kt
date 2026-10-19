@@ -217,7 +217,7 @@ fun DashboardScreen() {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Si la pop-up n'apparaît pas sur une vraie offre : attendez une offre, revenez ici, puis partagez le diagnostic (textes lus à l'écran, rien n'est envoyé automatiquement).",
+                    "Si la pop-up n'apparaît pas sur une vraie offre : attendez une offre, puis partagez le journal (fichier .txt). Les textes lus ne sont plus affichés ici pour éviter que l'app ne se relise elle-même.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -230,7 +230,7 @@ fun DashboardScreen() {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { refresh() }) { Text("Rafraîchir") }
-                    Button(onClick = { shareDiagnostic(context) }) { Text("Partager") }
+                    Button(onClick = { shareDiagnostic(context) }) { Text("Partager le journal") }
                 }
             }
         }
@@ -312,14 +312,26 @@ private fun PermissionCard(
 }
 
 private fun diagnosticSummary(): String =
-    Diagnostics.summary(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported)
+    Diagnostics.shortSummary(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported)
 
+/** Écrit le journal complet dans un fichier .txt et le partage (pièce jointe). */
 private fun shareDiagnostic(context: Context) {
-    val send = Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
-        .putExtra(Intent.EXTRA_SUBJECT, "Diagnostic VTC Copilot")
-        .putExtra(Intent.EXTRA_TEXT, Diagnostics.report(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported))
-    runCatching { context.startActivity(Intent.createChooser(send, "Partager le diagnostic")) }
+    runCatching {
+        val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.FRANCE).format(java.util.Date())
+        val file = java.io.File(dir, "vtc_copilot_journal_$stamp.txt")
+        file.writeText(
+            Diagnostics.report(RideAccessibilityService.isRunning, RideAccessibilityService.ocrSupported),
+            Charsets.UTF_8
+        )
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_SUBJECT, "Journal VTC Copilot")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(send, "Partager le journal"))
+    }
 }
 
 private fun openAccessibilitySettings(context: Context) {

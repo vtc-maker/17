@@ -39,6 +39,15 @@ class RideRepository @Inject constructor(
 
     suspend fun clearAll() = rideDao.deleteAll()
 
+    /** Import CSV : ajoute les courses absentes (même minute + même plateforme + même prix = doublon). Renvoie le nombre ajouté. */
+    suspend fun importRides(rides: List<RideEntity>): Int {
+        fun key(r: RideEntity) = "${r.capturedAtEpochMs / 60_000}|${r.sourcePackage}|${r.grossPriceEuros}"
+        val existing = rideDao.getAll().map(::key).toHashSet()
+        val fresh = rides.filter { existing.add(key(it)) }
+        if (fresh.isNotEmpty()) rideDao.insertAll(fresh.map { it.copy(id = 0) })
+        return fresh.size
+    }
+
     suspend fun updateStatus(id: Long, status: String) = rideDao.updateStatus(id, status)
 
     fun observeAll(): Flow<List<RideEntity>> = rideDao.observeAll()

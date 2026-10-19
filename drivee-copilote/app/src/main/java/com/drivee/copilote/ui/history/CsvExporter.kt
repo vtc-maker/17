@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.drivee.copilote.data.local.entity.RideEntity
+import com.drivee.copilote.data.local.entity.RideStatus
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -36,7 +37,11 @@ object CsvExporter {
         "€/km net",
         "€/h net",
         "Bénéfice net (€)",
-        "Score"
+        "Score",
+        "€/km brut",
+        "€/h brut",
+        "Ratio seuil",
+        "Statut"
     )
 
     /** Construit le contenu CSV pour une liste de courses. */
@@ -56,7 +61,11 @@ object CsvExporter {
                 num(r.netPricePerKmEuros),
                 num(r.netHourlyRateEuros),
                 num(r.netProfitEuros),
-                scoreLabel(r.score)
+                scoreLabel(r.score),
+                num(r.grossPricePerKmEuros),
+                num(r.grossHourlyRateEuros),
+                num(r.thresholdRatio),
+                statusLabel(r.status)
             )
             sb.append(row.joinToString(";")).append("\r\n")
         }
@@ -96,6 +105,12 @@ object CsvExporter {
         "ee.mtakso.driver" -> "Bolt"
         "com.heetch.driver" -> "Heetch"
         else -> pkg
+    }
+
+    private fun statusLabel(status: String): String = when (status) {
+        RideStatus.REJECTED -> "Pas prise"
+        RideStatus.PENDING -> "À valider"
+        else -> "Prise"
     }
 
     private fun scoreLabel(score: String): String = when (score) {
