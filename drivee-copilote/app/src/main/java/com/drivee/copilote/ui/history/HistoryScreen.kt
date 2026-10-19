@@ -23,6 +23,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -67,6 +71,25 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
+    var toDelete by remember { mutableStateOf<RideEntity?>(null) }
+
+    toDelete?.let { ride ->
+        AlertDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text("Supprimer cette course ?") },
+            text = {
+                Text(
+                    "${platformName(ride.sourcePackage)} · " +
+                        (ride.grossPriceEuros?.let { String.format(Locale.FRANCE, "%.2f €", it) } ?: "—") + " · " +
+                        SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(Date(ride.capturedAtEpochMs))
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.delete(ride.id); toDelete = null }) { Text("Supprimer") }
+            },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Annuler") } }
+        )
+    }
 
     // Import d'une sauvegarde CSV (sélecteur de fichiers Android, aucune permission requise).
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -124,7 +147,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                 TextButton(onClick = {
                     importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel", "application/octet-stream"))
                 }) { Text("Importer") }
-                TextButton(onClick = { confirmClear = true }) { Text("Effacer") }
+                TextButton(onClick = { confirmClear = true }) { Text("Tout effacer") }
             }
         }
 
@@ -132,7 +155,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
         if (state.pending.isNotEmpty()) {
             item { SectionTitle("À valider", state.pending.size, Color(0xFFF5A524)) }
             items(state.pending, key = { "p${it.id}" }) { ride ->
-                RideCard(ride, highlight = null) {
+                RideCard(ride, highlight = null, onDelete = { toDelete = ride }) {
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
@@ -190,7 +213,11 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
             }
         } else {
             items(state.rides, key = { it.id }) { ride ->
-                RideCard(ride, highlight = if (state.tab == HistoryTab.NOT_TAKEN) "Pas pris" else null)
+                RideCard(
+                    ride,
+                    highlight = if (state.tab == HistoryTab.NOT_TAKEN) "Pas pris" else null,
+                    onDelete = { toDelete = ride }
+                )
             }
         }
         item { Spacer(Modifier.height(16.dp)) }
@@ -215,7 +242,12 @@ private fun SectionTitle(title: String, count: Int, color: Color) {
 
 /** Carte d'une course : badge note, verdict (ou "Pas pris"), plateforme, km · €/km, prix, heure. */
 @Composable
-private fun RideCard(ride: RideEntity, highlight: String?, extra: (@Composable () -> Unit)? = null) {
+private fun RideCard(
+    ride: RideEntity,
+    highlight: String?,
+    onDelete: () -> Unit,
+    extra: (@Composable () -> Unit)? = null
+) {
     val context = LocalContext.current
     val timeFmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE) }
     val color = scoreColor(context, ride.score)
@@ -270,6 +302,13 @@ private fun RideCard(ride: RideEntity, highlight: String?, extra: (@Composable (
                         timeFmt.format(Date(ride.capturedAtEpochMs)),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Supprimer cette course",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

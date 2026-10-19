@@ -66,6 +66,8 @@ class HistoryViewModel @Inject constructor(
 
     fun clearAll() { viewModelScope.launch { repository.clearAll() } }
 
+    fun delete(id: Long) { viewModelScope.launch { repository.delete(id) } }
+
     /** Importe une sauvegarde CSV (format de l'export VTC Copilot). */
     fun importCsv(text: String, onDone: (String) -> Unit) {
         viewModelScope.launch {

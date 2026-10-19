@@ -39,6 +39,8 @@ class RideRepository @Inject constructor(
 
     suspend fun clearAll() = rideDao.deleteAll()
 
+    suspend fun delete(id: Long) = rideDao.deleteById(id)
+
     /** Import CSV : ajoute les courses absentes (même minute + même plateforme + même prix = doublon). Renvoie le nombre ajouté. */
     suspend fun importRides(rides: List<RideEntity>): Int {
         fun key(r: RideEntity) = "${r.capturedAtEpochMs / 60_000}|${r.sourcePackage}|${r.grossPriceEuros}"

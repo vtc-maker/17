@@ -60,12 +60,11 @@ class RideAccessibilityService : AccessibilityService() {
     private val ocr by lazy { ScreenOcr(this) }
     private val bubble by lazy { FloatingBubble(this) { openApp() } }
     /** Historique : seules les offres ACCEPTÉES sont enregistrées. */
-    private val acceptance = AcceptanceTracker<Pair<RideOffer, ProfitabilityMetrics>>()
+    private val acceptance = AcceptanceTracker<Pair<RideOffer, ProfitabilityMetrics>>(sameOffer = ::sameOffer)
 
     private var analyzeJob: Job? = null
     private var hideJob: Job? = null
     private var lastOfferSignature: String? = null
-    private var lastItem: Pair<RideOffer, ProfitabilityMetrics>? = null
     @Volatile private var lastEventPkg: String? = null
     private var demoIndex = 0
 
@@ -82,6 +81,10 @@ class RideAccessibilityService : AccessibilityService() {
         private const val TAG = "RideA11yService"
         private const val THROTTLE_MS = 250L
         private const val HIDE_DELAY_MS = 1_500L
+
+        /** Textes présents uniquement sur la carte d'offre Uber / Bolt (lecture OCR). */
+        private val UBER_CARD = Regex("(?i)montant net de frais|course de \\d|\\buberx\\b|\\bcomfort\\b|exclusivit|uber green|\\buber ?van\\b")
+        private val BOLT_CARD = Regex("(?i)net,? ?ttc|\\bbolt\\s?(green|xl|comfort|eco|premium)\\b|forte demande")
 
         @Volatile
         private var instance: RideAccessibilityService? = null
@@ -214,7 +217,9 @@ class RideAccessibilityService : AccessibilityService() {
                 acceptance.onScreen(screenTexts)?.let { record(it) }
                 return
             }
-            parsed = parser.parseTexts(lines, pkg, config)
+            // Plateforme d'après le CONTENU de la carte (l'app au premier plan peut être le
+            // menu du téléphone avec une bulle Bolt, alors que l'offre affichée est Uber).
+            parsed = parser.parseTexts(lines, platformFromCard(lines) ?: pkg, config)
             Diagnostics.onAnalysis("OCR", pkg, roots.size, lines, parsed)
             screenTexts = screenTexts + lines
         }
@@ -228,23 +233,41 @@ class RideAccessibilityService : AccessibilityService() {
         hideJob?.cancel()
         hideJob = null
 
-        // Déduplication (prix seul : l'OCR peut lire les km légèrement différemment d'une image à l'autre).
+        // Une même offre est lue plusieurs fois (et l'OCR peut varier sur le prix) : le tracker
+        // regroupe les lectures de même distance et garde la lecture majoritaire.
         val signature = "${parsed.sourcePackage}|${parsed.grossPriceEuros}"
-        if (signature == lastOfferSignature) {
-            lastItem?.let { acceptance.offerVisible(signature, it) } // toujours à l'écran
-            return
-        }
-        lastOfferSignature = signature
-
         val settings = settingsRepository.getSettings()
         val offer = parsed.withEstimatedTimes(settings.avgSpeedKmh)
         val metrics = engine.compute(offer, settings)
-        overlay.show(OfferDisplay.from(offer, metrics))
-        if (settings.soundEnabled) sound.play(metrics.score)
-
         val item = offer to metrics
-        lastItem = item
-        acceptance.offerVisible(signature, item)?.let { record(it) }
+        val isNewOffer = !acceptance.isKnown(item)
+        acceptance.offerVisible(signature, item).forEach { record(it) }
+
+        // Affiche la lecture majoritaire ; ne ré-affiche / ne re-sonne que si elle change.
+        val best = acceptance.currentItem() ?: item
+        val bestSignature = "${best.first.sourcePackage}|${best.first.grossPriceEuros}"
+        if (bestSignature == lastOfferSignature) return
+        lastOfferSignature = bestSignature
+        overlay.show(OfferDisplay.from(best.first, best.second))
+        if (isNewOffer && settings.soundEnabled) sound.play(best.second.score)
+    }
+
+    /** Marqueurs propres à chaque carte d'offre (jamais présents sur les bulles / icônes du menu). */
+    private fun platformFromCard(lines: List<String>): String? {
+        val text = lines.joinToString("\n")
+        return when {
+            UBER_CARD.containsMatchIn(text) -> Platforms.UBER
+            BOLT_CARD.containsMatchIn(text) -> Platforms.BOLT
+            else -> null
+        }
+    }
+
+    /** Même offre réelle = même distance totale (±0,6 km ou ±6 %), quelle que soit la lecture du prix. */
+    private fun sameOffer(a: Pair<RideOffer, ProfitabilityMetrics>, b: Pair<RideOffer, ProfitabilityMetrics>): Boolean {
+        val ka = a.first.totalDistanceKm
+        val kb = b.first.totalDistanceKm
+        if (ka == null || kb == null) return a.first.grossPriceEuros == b.first.grossPriceEuros
+        return kotlin.math.abs(ka - kb) <= maxOf(0.6, 0.06 * maxOf(ka, kb))
     }
 
     /** Enregistre la décision dans l'historique : prise, pas prise ou à valider. */

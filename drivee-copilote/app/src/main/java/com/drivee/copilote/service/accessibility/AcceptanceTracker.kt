@@ -1,8 +1,8 @@
 package com.drivee.copilote.service.accessibility
 
 /**
- * Détermine si une offre affichée a été ACCEPTÉE ou non, pour n'enregistrer dans
- * l'historique que les courses réellement prises.
+ * Détermine si une offre affichée a été ACCEPTÉE ou non, et garantit qu'UNE offre réelle
+ * ne donne qu'UNE seule ligne d'historique.
  *
  * Signaux utilisés (du plus fiable au moins fiable) :
  *  1. clic sur "Accepter" / "Refuser" (événement d'accessibilité, si l'app l'expose) ;
@@ -11,23 +11,38 @@ package com.drivee.copilote.service.accessibility
  *     - retour à l'attente ("Vous êtes en ligne", "Passer hors ligne"…) → REFUSÉE
  *  3. aucune preuve après [timeoutMs], ou nouvelle offre entre-temps → À VALIDER (le chauffeur tranche).
  *
- * Même offre ré-affichée (lecture momentanément ratée) = pas une nouvelle offre.
- * Une offre déjà décidée n'est jamais comptée deux fois.
+ * Lectures multiples d'une même offre : l'OCR peut lire le prix différemment d'une image à
+ * l'autre (10,03 / 10,55 / 96,00…). [sameOffer] regroupe ces lectures (même distance) et la
+ * lecture retenue est celle vue le PLUS SOUVENT (vote), pas la dernière.
  */
 class AcceptanceTracker<T>(
     private val clock: () -> Long = System::currentTimeMillis,
     private val timeoutMs: Long = 30_000L,
-    private val idleGraceMs: Long = 2_500L
+    private val idleGraceMs: Long = 2_500L,
+    /** Deux lectures correspondent-elles à la même offre réelle ? */
+    private val sameOffer: (T, T) -> Boolean = { a, b -> a == b },
+    /** Une offre déjà décidée relue dans cet intervalle est ignorée (pas de doublon). */
+    private val decidedMemoryMs: Long = 180_000L
 ) {
     enum class Decision { ACCEPTED, REJECTED, PENDING }
 
     data class Result<T>(val item: T, val decision: Decision)
 
-    private class Slot<T>(val key: String, val item: T, var goneAt: Long = 0L)
+    private class Slot<T>(key: String, first: T) {
+        var goneAt: Long = 0L
+        private val votes = LinkedHashMap<String, Pair<T, Int>>().apply { put(key, first to 1) }
+        fun vote(key: String, item: T) {
+            val prev = votes[key]
+            votes[key] = item to ((prev?.second ?: 0) + 1)
+        }
+        /** Lecture majoritaire (à égalité : la première vue). */
+        val item: T get() = votes.values.maxByOrNull { it.second }!!.first
+        val sample: T get() = votes.values.first().first
+    }
 
     private var current: Slot<T>? = null
     private var awaiting: Slot<T>? = null
-    private val decidedKeys = ArrayDeque<String>()
+    private val decided = ArrayDeque<Pair<T, Long>>()
 
     companion object {
         private val ACCEPT_CLICK = Regex("(?i)\\b(accepter|accept|répondre|repondre)\\b")
@@ -48,24 +63,37 @@ class AcceptanceTracker<T>(
         )
     }
 
+    /** Vrai si cette lecture appartient à une offre déjà suivie ou déjà décidée (pas de nouveau son). */
+    @Synchronized
+    fun isKnown(item: T): Boolean =
+        current?.let { sameOffer(it.sample, item) } == true ||
+            awaiting?.let { sameOffer(it.sample, item) } == true ||
+            recentlyDecided(item)
+
+    /** Meilleure lecture (majoritaire) de l'offre actuellement à l'écran. */
+    @Synchronized
+    fun currentItem(): T? = current?.item
+
     /**
-     * Une offre est visible à l'écran. L'offre précédente déjà disparue sans preuve → À VALIDER.
-     * Une offre encore "visible" remplacée par une autre lecture = mauvaise lecture → ignorée.
+     * Une offre est lue à l'écran. Renvoie les décisions éventuelles des offres précédentes
+     * (une offre différente arrive → la précédente non tranchée passe À VALIDER).
      */
     @Synchronized
-    fun offerVisible(key: String, item: T): Result<T>? {
-        if (key in decidedKeys) return null
-        if (current?.key == key) return null
-        val aw = awaiting
-        if (aw != null && aw.key == key) { // même offre, lecture momentanément ratée
-            current = aw
-            awaiting = null
-            return null
+    fun offerVisible(key: String, item: T): List<Result<T>> {
+        current?.let { c -> if (sameOffer(c.sample, item)) { c.vote(key, item); return emptyList() } }
+        awaiting?.let { aw ->
+            if (sameOffer(aw.sample, item)) { // même offre, lecture momentanément ratée
+                aw.vote(key, item)
+                current = aw
+                awaiting = null
+                return emptyList()
+            }
         }
-        current?.let { decide(it, Decision.REJECTED) } // ancienne lecture remplacée : ignorée
+        if (recentlyDecided(item)) return emptyList()
+        val results = listOfNotNull(current, awaiting).map { decide(it, Decision.PENDING) }
         awaiting = null
         current = Slot(key, item)
-        return aw?.let { decide(it, Decision.PENDING) }
+        return results
     }
 
     /** L'offre n'est plus lue à l'écran : on attend l'écran suivant pour décider. */
@@ -106,9 +134,15 @@ class AcceptanceTracker<T>(
         return decide(aw, decision)
     }
 
+    private fun recentlyDecided(item: T): Boolean {
+        val now = clock()
+        while (decided.isNotEmpty() && now - decided.first().second > decidedMemoryMs) decided.removeFirst()
+        return decided.any { sameOffer(it.first, item) }
+    }
+
     private fun decide(slot: Slot<T>, decision: Decision): Result<T> {
-        decidedKeys.addLast(slot.key)
-        while (decidedKeys.size > 20) decidedKeys.removeFirst()
+        decided.addLast(slot.sample to clock())
+        while (decided.size > 20) decided.removeFirst()
         return Result(slot.item, decision)
     }
 }
