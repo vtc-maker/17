@@ -22,13 +22,15 @@ class AcceptanceTracker<T>(
     /** Deux lectures correspondent-elles à la même offre réelle ? */
     private val sameOffer: (T, T) -> Boolean = { a, b -> a == b },
     /** Une offre déjà décidée relue dans cet intervalle est ignorée (pas de doublon). */
-    private val decidedMemoryMs: Long = 180_000L
+    private val decidedMemoryMs: Long = 180_000L,
+    /** Offre plus relue depuis ce délai (l'app VTC n'envoie plus d'événements) = disparue. */
+    private val staleMs: Long = 12_000L
 ) {
     enum class Decision { ACCEPTED, REJECTED, PENDING }
 
     data class Result<T>(val item: T, val decision: Decision)
 
-    private class Slot<T>(key: String, first: T) {
+    private class Slot<T>(key: String, first: T, var lastSeen: Long) {
         var goneAt: Long = 0L
         private val votes = LinkedHashMap<String, Pair<T, Int>>().apply { put(key, first to 1) }
         fun vote(key: String, item: T) {
@@ -53,13 +55,17 @@ class AcceptanceTracker<T>(
             "(?i)récupérer|recuperer|en route vers|je suis arrivé|vous êtes arrivé|arrivé au point|" +
                 "commencer la course|démarrer la course|commencer le trajet|terminer la course|" +
                 "annuler la course|appeler le passager|appeler le client|contacter le passager|" +
-                "message au passager|envoyer un message|pick up|picking up|arrived|start trip|swipe to start"
+                "message au passager|envoyer un message|pick up|picking up|arrived|start trip|swipe to start|" +
+                "prise en charge du passager|glisser pour (arriver|commencer|démarrer)|faites glisser pour|" +
+                "je suis là|naviguer vers le passager"
         )
 
         /** Écran d'attente (aucune course en cours). */
         private val IDLE_SCREEN = Regex(
             "(?i)vous êtes en ligne|passer hors ligne|recherche de courses|recherche de clients|" +
-                "en attente de courses|offre expirée|demande expirée|vous avez refusé|you're online|finding trips"
+                "en attente de courses|offre expirée|demande expirée|vous avez refusé|you're online|finding trips|" +
+                "commande expirée|course expirée|demande annulée|commande annulée|hors ligne|" +
+                "en attente de commandes|recherche de commandes|go offline"
         )
     }
 
@@ -80,10 +86,11 @@ class AcceptanceTracker<T>(
      */
     @Synchronized
     fun offerVisible(key: String, item: T): List<Result<T>> {
-        current?.let { c -> if (sameOffer(c.sample, item)) { c.vote(key, item); return emptyList() } }
+        current?.let { c -> if (sameOffer(c.sample, item)) { c.vote(key, item); c.lastSeen = clock(); return emptyList() } }
         awaiting?.let { aw ->
             if (sameOffer(aw.sample, item)) { // même offre, lecture momentanément ratée
                 aw.vote(key, item)
+                aw.lastSeen = clock()
                 current = aw
                 awaiting = null
                 return emptyList()
@@ -92,8 +99,29 @@ class AcceptanceTracker<T>(
         if (recentlyDecided(item)) return emptyList()
         val results = listOfNotNull(current, awaiting).map { decide(it, Decision.PENDING) }
         awaiting = null
-        current = Slot(key, item)
+        current = Slot(key, item, clock())
         return results
+    }
+
+    /**
+     * Minuteur appelé régulièrement, MÊME sans événement de l'app VTC (ex : Bolt reste muet
+     * après expiration de l'offre, ou le chauffeur ouvre VTC Copilot). Sans lui, l'offre restait
+     * bloquée en mémoire et n'était jamais enregistrée.
+     */
+    @Synchronized
+    fun tick(): Result<T>? {
+        val now = clock()
+        current?.let { c ->
+            if (now - c.lastSeen >= staleMs) {
+                c.goneAt = c.lastSeen
+                awaiting = c
+                current = null
+            }
+        }
+        val aw = awaiting ?: return null
+        if (now - aw.goneAt < timeoutMs) return null
+        awaiting = null
+        return decide(aw, Decision.PENDING)
     }
 
     /** L'offre n'est plus lue à l'écran : on attend l'écran suivant pour décider. */

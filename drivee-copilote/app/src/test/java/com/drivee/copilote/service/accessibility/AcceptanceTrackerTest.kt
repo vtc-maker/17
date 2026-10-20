@@ -109,6 +109,26 @@ class AcceptanceTrackerTest {
     }
 
     @Test
+    fun `offre Bolt sans aucun evenement apres = enregistree A VALIDER par le minuteur`() {
+        tracker.offerVisible("a", "A")
+        now = 5_000; assertNull(tracker.tick())   // encore visible récemment
+        now = 13_000; assertNull(tracker.tick())  // jugée disparue (12 s sans lecture), on attend
+        now = 43_000
+        val r = tracker.tick()!!
+        assertEquals("A", r.item)
+        assertEquals(Decision.PENDING, r.decision)
+        assertNull(tracker.tick()) // une seule ligne
+    }
+
+    @Test
+    fun `offre Bolt expiree puis ecran d'attente Bolt = REFUSEE`() {
+        tracker.offerVisible("a", "A")
+        now = 1_000; tracker.offerGone()
+        now = 4_000
+        assertEquals(Decision.REJECTED, tracker.onScreen(listOf("Commande expirée"))!!.decision)
+    }
+
+    @Test
     fun `une vraie nouvelle offre (autre distance) reste distincte`() {
         ocrTracker.offerVisible("10.03", 10.03 to 10.5)
         assertFalse(ocrTracker.isKnown(14.0 to 15.0))

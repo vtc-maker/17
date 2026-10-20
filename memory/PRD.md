@@ -95,3 +95,8 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - 2026-10-19: 16 KB : jniLibs useLegacyPackaging=true (libs ML Kit déjà ELF 16 KB, AGP 8.2 n'aligne pas le zip).
 - 2026-10-19: Fix plateforme erronée (offre Bolt lue comme Uber) : collectRoots ignore les petites fenêtres (bulle Uber), priorise la fenêtre d'app active puis la plus grande.
 - 2026-10-19: Fix doublons historique : AcceptanceTracker regroupe les lectures d'une même offre (même distance ±0,6 km/6 %) + vote du prix majoritaire, mémoire des offres décidées 3 min, son uniquement pour une nouvelle offre; plateforme OCR déduite du contenu de la carte (UBER_CARD/BOLT_CARD); suppression course par course (icône poubelle + confirmation) + 'Tout effacer'.
+
+## 2026-10-20 – Fix: offres Bolt non enregistrées dans l'historique
+- AcceptanceTracker.tick() + minuteur 3 s dans RideAccessibilityService : une offre plus relue depuis 12 s est considérée disparue, puis enregistrée 'à valider' après 30 s si aucun écran de décision n'est vu (Bolt n'envoie plus d'événements après expiration).
+- Ajout de textes d'écran Bolt (commande expirée, hors ligne, glisser pour arriver…).
+- 11 tests JVM AcceptanceTracker OK.

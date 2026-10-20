@@ -81,6 +81,7 @@ class RideAccessibilityService : AccessibilityService() {
         private const val TAG = "RideA11yService"
         private const val THROTTLE_MS = 250L
         private const val HIDE_DELAY_MS = 1_500L
+        private const val WATCHDOG_MS = 3_000L
 
         /** Textes présents uniquement sur la carte d'offre Uber / Bolt (lecture OCR). */
         private val UBER_CARD = Regex("(?i)montant net de frais|course de \\d|\\buberx\\b|\\bcomfort\\b|exclusivit|uber green|\\buber ?van\\b")
@@ -133,6 +134,13 @@ class RideAccessibilityService : AccessibilityService() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         applyState()
+        // Décide les offres restées sans suite même si l'app VTC n'envoie plus aucun événement.
+        scope.launch {
+            while (true) {
+                delay(WATCHDOG_MS)
+                acceptance.tick()?.let { record(it) }
+            }
+        }
         Log.i(TAG, "Service d'accessibilité connecté.")
     }
 
