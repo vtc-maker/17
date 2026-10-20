@@ -123,20 +123,20 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     ) {
         item {
             Spacer(Modifier.height(20.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Votre historique",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        "${state.takenCount} course(s) prise(s) · ${state.pending.size} en attente",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Column(Modifier.fillMaxWidth()) {
+            Text(
+                "Votre historique",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1
+            )
+            Text(
+                "${state.takenCount} course(s) prise(s) · ${state.pending.size} en attente",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(
                     enabled = state.rides.isNotEmpty(),
                     onClick = {
@@ -149,6 +149,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                     importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel", "application/octet-stream"))
                 }) { Text("Importer") }
                 TextButton(onClick = { confirmClear = true }) { Text("Tout effacer") }
+            }
             }
         }
 
@@ -282,15 +283,23 @@ private fun RideCard(
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
+                    // km et €/km chacun sur sa ligne, alignés à gauche (plus de coupure au milieu).
                     Text(
-                        buildString {
-                            append(String.format(Locale.US, "%.1f km", km))
-                            ride.grossPricePerKmEuros?.let { append("  ·  ").append(String.format(Locale.FRANCE, "%.2f €/km", it)) }
-                        },
+                        String.format(Locale.FRANCE, "%.1f km", km),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
+                    ride.grossPricePerKmEuros?.let {
+                        Text(
+                            String.format(Locale.FRANCE, "%.2f €/km", it),
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(

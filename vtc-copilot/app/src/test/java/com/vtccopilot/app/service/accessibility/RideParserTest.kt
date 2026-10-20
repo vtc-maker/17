@@ -156,6 +156,16 @@ class RideParserTest {
     }
 
     @Test
+    fun `Bolt - bonus +3,11 euros proche des km ignore, prix Net TTC retenu`() {
+        val texts = listOf(
+            "Refuser", "4 min", "1.2 km", "+3.11€", "Nice Ville • 10.2 km",
+            "Bolt • Karim", "4.9", "13.11€ · Net, TTC", "Accepter"
+        )
+        val offer = parser.parseTexts(texts, "ee.mtakso.driver", config)
+        assertEquals(13.11, offer!!.grossPriceEuros!!, 0.001)
+    }
+
+    @Test
     fun `capture reelle Bolt - approche en metres, course sans duree`() {
         val texts = listOf(
             "Refuser", "<1 min", "135 m",

@@ -22,6 +22,8 @@ object Diagnostics {
     @Volatile var lastOcr: Capture? = null; private set
     /** Dernière capture (nœuds ou OCR) où un bouton Accepter/Refuser était visible. */
     @Volatile var lastOfferLike: Capture? = null; private set
+    /** Textes exacts lus sur la dernière offre détectée (pour comprendre une erreur de prix). */
+    @Volatile var lastOfferTexts: Capture? = null; private set
     @Volatile var lastDetected: String? = null; private set
     @Volatile var lastDecision: String? = null; private set
 
@@ -76,6 +78,7 @@ object Diagnostics {
         val capture = Capture(System.currentTimeMillis(), pkg, windows, texts, "$source : $result")
         if (source == "OCR") lastOcr = capture else lastNodes = capture
         if (texts.any { anchor.containsMatchIn(it) }) lastOfferLike = capture
+        if (offer != null) lastOfferTexts = capture
         if (offer != null && lastDetected != "${time(capture.at)} ${capture.result}") {
             lastDetected = "${time(capture.at)} ${capture.result}"
             log("Détection ${capture.result}")
@@ -93,7 +96,7 @@ object Diagnostics {
     fun report(serviceRunning: Boolean, ocrSupported: Boolean): String = buildString {
         appendLine("VTC Copilot — diagnostic")
         appendLine(summary(serviceRunning, ocrSupported))
-        listOf("OFFRE (Accepter visible)" to lastOfferLike, "NŒUDS" to lastNodes, "OCR" to lastOcr).forEach { (title, c) ->
+        listOf("TEXTES DE LA DERNIÈRE OFFRE DÉTECTÉE" to lastOfferTexts, "OFFRE (Accepter visible)" to lastOfferLike, "NŒUDS" to lastNodes, "OCR" to lastOcr).forEach { (title, c) ->
             appendLine()
             appendLine("--- $title ${c?.let { "${time(it.at)} · ${it.windows} fenêtre(s) · ${it.result}" } ?: "—"} ---")
             c?.texts?.forEach { appendLine(it) }

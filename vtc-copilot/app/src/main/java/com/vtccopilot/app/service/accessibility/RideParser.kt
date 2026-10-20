@@ -33,6 +33,10 @@ class RideParser @Inject constructor() {
         private const val DEBUG_DUMP = false       // passer à true pour logger les textes
         private val NUMBER_REGEX = Regex("(\\d+(?:[.,]\\d{1,2})?)")
         private val UNIT_REGEX = Regex("(?i)\\d[\\s\\u00A0\\u202F]*(?:km|min|m)\\b")
+        private val NOT_PRICE_REGEX = Regex(
+            "(?i)^\\s*\\+|€\\s*/\\s*(?:km|h|min)|\\bbonus|\\bboost|\\bprime\\b|pourboire|supplément|en plus|revenus supplémentaires|jusqu'à"
+        )
+        private val NET_PRICE_REGEX = Regex("(?i)\\bnet\\b|\\bttc\\b|prix|tarif")
     }
 
     /** Résultat interne du parcours d'arbre. */
@@ -176,10 +180,15 @@ class RideParser @Inject constructor() {
         // Plusieurs montants possibles (ex : "0,00 €" des gains du jour en haut d'écran) :
         // on garde le montant > 0 le plus PROCHE de la 1re ligne "X min / X km" de la carte d'offre.
         val lines = harvest.texts
-        val candidates = lines.withIndex().mapNotNull { (i, line) ->
+        // Bonus / suppléments ("+3,11 €", "Boost", "€/km"…) ne sont PAS le prix de la course.
+        val all = lines.withIndex().mapNotNull { (i, line) ->
+            if (NOT_PRICE_REGEX.containsMatchIn(line)) return@mapNotNull null
             extractNumber(line, rules.pricePatterns)?.takeIf { it > 0.0 }?.let { i to it }
         }
-        if (candidates.isEmpty()) return null
+        if (all.isEmpty()) return null
+        // Le prix Bolt est libellé "Net, TTC" : prioritaire s'il existe.
+        val labelled = all.filter { NET_PRICE_REGEX.containsMatchIn(lines[it.first]) }
+        val candidates = labelled.ifEmpty { all }
         val ref = lines.indexOfFirst { UNIT_REGEX.containsMatchIn(it) }
         if (ref < 0) return candidates.first().second
         return candidates.minByOrNull { kotlin.math.abs(it.first - ref) }?.second
