@@ -27,6 +27,9 @@ import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import com.vtccopilot.app.R
 import com.vtccopilot.app.data.prefs.AppColors
+import com.vtccopilot.app.data.prefs.PopupLayout
+import com.vtccopilot.app.data.prefs.PopupPrefs
+import com.vtccopilot.app.data.prefs.PopupTheme
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -54,11 +57,6 @@ class OfferOverlay(private val context: Context) {
     companion object {
         private const val TAG = "OfferOverlay"
         private const val AUTO_DISMISS_MS = 30_000L
-
-        private const val BG = 0xF2111513.toInt()
-        private const val STROKE = 0x26FFFFFF
-        private const val TEXT = 0xFFF2F4F5.toInt()
-        private const val TEXT_SOFT = 0xFFE3E6E8.toInt()
     }
 
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -73,19 +71,30 @@ class OfferOverlay(private val context: Context) {
     private var savedX = 0
     private var savedY: Int? = null
 
+    /** Mise en page + style avec lesquels la vue actuelle a été construite. */
+    private var layout = PopupLayout.COMPLET
+    private var theme = PopupTheme.ACTUEL
+
+    private lateinit var card: FrameLayout
     private lateinit var accent: View
     private lateinit var platformTv: TextView
     private lateinit var perKmTv: TextView
     private lateinit var priceTv: TextView
     private lateinit var hourlyTv: TextView
-    private lateinit var tripTv: TextView
-    private lateinit var gauge: GaugeView
+    private var tripTv: TextView? = null
+    private var verdictTv: TextView? = null
+    private var gauge: GaugeView? = null
     private var bigSp = 26f
     private var rowAvailablePx = 0
 
     fun show(d: OfferDisplay) {
         main.post {
             try {
+                val l = PopupPrefs.layout(context)
+                val t = PopupPrefs.theme(context)
+                if (root != null && (l != layout || t != theme)) removeNow() // style changé dans les réglages
+                layout = l
+                theme = t
                 if (root == null) attach()
                 bind(d)
                 main.removeCallbacks(dismissRunnable)
@@ -144,14 +153,23 @@ class OfferOverlay(private val context: Context) {
         runCatching { wm.removeViewImmediate(v) }.onFailure { Log.w(TAG, "removeView a échoué", it) }
     }
 
+    /** Police du style : mono (Actuel / Néon), serif (Classe), machine à écrire grasse (Rétro). */
+    private fun popupTypeface(): Typeface = when (theme) {
+        PopupTheme.CLASSE -> Typeface.create("serif", Typeface.NORMAL)
+        PopupTheme.NEON -> Typeface.create(mono, Typeface.BOLD)
+        PopupTheme.RETRO -> Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        PopupTheme.ACTUEL -> mono
+    }
+
     private fun build(windowW: Int): View {
+        val compact = layout == PopupLayout.COMPACT
         val outer = FrameLayout(context).apply { setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(6f)) }
 
-        val card = FrameLayout(context).apply {
+        card = FrameLayout(context).apply {
             background = GradientDrawable().apply {
-                setColor(BG)
-                cornerRadius = dp(26f)
-                setStroke(dpi(1f), STROKE)
+                setColor(theme.bg)
+                cornerRadius = dp(if (compact) min(theme.radiusDp, 18f) else theme.radiusDp)
+                setStroke(dpi(theme.strokeDp), theme.stroke)
             }
             elevation = dp(8f)
         }
@@ -163,79 +181,123 @@ class OfferOverlay(private val context: Context) {
             leftMargin = dpi(70f); rightMargin = dpi(70f)
         })
 
+        val padH = if (compact) 12f else 18f
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dpi(18f), dpi(18f), dpi(18f), dpi(8f))
+            if (compact) setPadding(dpi(padH), dpi(10f), dpi(padH), dpi(10f))
+            else setPadding(dpi(padH), dpi(18f), dpi(padH), dpi(if (layout == PopupLayout.XXL) 14f else 8f))
         }
         card.addView(content)
 
         // Taille des gros chiffres adaptée à la largeur de l'écran.
         val widthDp = windowW / context.resources.displayMetrics.density
         bigSp = (widthDp / 13f).coerceIn(20f, 32f)
-        // Largeur utile de la 1re ligne = fenêtre − marges extérieures (2×6dp) − marges du contenu (2×18dp).
-        rowAvailablePx = windowW - dpi(12f) - dpi(36f)
+        // Largeur utile = fenêtre − marges extérieures (2×6dp) − marges du contenu.
+        rowAvailablePx = windowW - dpi(12f) - dpi(2 * padH)
+
+        platformTv = text(12f, theme.textSoft).apply { letterSpacing = 0.1f; setPadding(0, 0, dpi(8f), 0) }
+        perKmTv = text(bigSp, theme.text)
+        priceTv = text(bigSp + 2f, theme.text)
+        hourlyTv = text(bigSp, theme.text)
+        tripTv = null
+        verdictTv = null
+        gauge = null
+
+        if (layout == PopupLayout.XXL) {
+            verdictTv = text(bigSp * 2f, theme.text).apply { gravity = Gravity.CENTER }
+            content.addView(verdictTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dpi(10f)
+            })
+        }
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             isBaselineAligned = true
+            gravity = Gravity.CENTER_VERTICAL
         }
-        platformTv = text(12f, TEXT).apply { letterSpacing = 0.1f; setPadding(0, 0, dpi(8f), 0) }
-        perKmTv = text(bigSp, TEXT)
-        priceTv = text(bigSp + 2f, TEXT)
-        hourlyTv = text(bigSp, TEXT)
         // Logo VTC Copilot (aligné sur la ligne de base des chiffres).
         val logo = ImageView(context).apply {
             setImageResource(R.drawable.app_logo)
             baselineAlignBottom = true
         }
-        row.addView(logo, LinearLayout.LayoutParams(dpi(22f), dpi(22f)).apply { rightMargin = dpi(6f) })
+        val logoDp = if (compact) 18f else 22f
+        row.addView(logo, LinearLayout.LayoutParams(dpi(logoDp), dpi(logoDp)).apply { rightMargin = dpi(6f) })
         row.addView(platformTv)
-        row.addView(perKmTv)
-        row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-        row.addView(priceTv)
-        row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-        row.addView(hourlyTv)
+        if (compact) {
+            // Une seule ligne fine : prix · €/km · €/h · verdict
+            row.addView(priceTv)
+            row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            row.addView(perKmTv)
+            row.addView(View(context), LinearLayout.LayoutParams(dpi(8f), 1))
+            row.addView(hourlyTv)
+            row.addView(View(context), LinearLayout.LayoutParams(dpi(10f), 1))
+            verdictTv = text(bigSp * 0.75f, theme.text)
+            row.addView(verdictTv)
+        } else {
+            row.addView(perKmTv)
+            row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            row.addView(priceTv)
+            row.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            row.addView(hourlyTv)
+        }
         content.addView(row)
 
-        tripTv = TextView(context).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTextColor(TEXT_SOFT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            maxLines = 1
+        if (!compact) {
+            tripTv = TextView(context).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTextColor(theme.textSoft)
+                typeface = if (theme == PopupTheme.ACTUEL) Typeface.create("sans-serif-medium", Typeface.NORMAL) else popupTypeface()
+                gravity = Gravity.CENTER
+                maxLines = 1
+            }
+            content.addView(tripTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dpi(6f)
+            })
         }
-        content.addView(tripTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = dpi(6f)
-        })
 
-        gauge = GaugeView(context, mono)
-        content.addView(gauge, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpi(66f)).apply {
-            topMargin = dpi(4f)
-        })
+        if (layout == PopupLayout.COMPLET) {
+            gauge = GaugeView(context, popupTypeface(), theme).also {
+                content.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpi(66f)).apply {
+                    topMargin = dpi(4f)
+                })
+            }
+        }
 
         return outer
     }
 
     private fun bind(d: OfferDisplay) {
-        val color = AppColors.forScore(context, d.score)
+        val color = theme.verdictColor(AppColors.forScore(context, d.score))
+        val label = PopupPrefs.label(context, d.score)
 
         platformTv.text = d.platform
         perKmTv.text = withUnit(d.perKm?.let { fmt("%.2f€", it) } ?: "—", "/km")
         priceTv.text = formatPrice(d.price)
         priceTv.setTextColor(color)
-        priceTv.setShadowLayer(dp(14f), 0f, 0f, withAlpha(color, 0.75f))
+        glow(priceTv, color, 14f)
         hourlyTv.text = withUnit(d.hourly?.let { fmt("%.0f€", it) } ?: "—", "/h")
-        tripTv.text = listOfNotNull(
+        tripTv?.text = listOfNotNull(
             d.minutes?.let { (if (d.timeEstimated) "~" else "") + "${it.roundToInt()} min" },
             d.km?.let { "${formatKm(it)} km" }
         ).joinToString(" · ")
-        fitFirstRow()
+        verdictTv?.let {
+            it.text = label
+            it.setTextColor(color)
+            glow(it, color, 12f)
+        }
+        fitTexts()
 
+        if (theme.strokeIsVerdict) (card.background as? GradientDrawable)?.setStroke(dpi(theme.strokeDp), color)
         accent.background = GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
             intArrayOf(Color.TRANSPARENT, color, Color.TRANSPARENT)
         )
-        gauge.update(d.thresholdRatio, color, d.score.label)
+        gauge?.update(d.thresholdRatio, color, label)
+    }
+
+    private fun glow(tv: TextView, color: Int, radiusDp: Float) {
+        if (theme.glow > 0f) tv.setShadowLayer(dp(radiusDp * theme.glow), 0f, 0f, withAlpha(color, 0.75f))
+        else tv.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -276,33 +338,43 @@ class OfferOverlay(private val context: Context) {
     }
 
     /**
-     * Réduit les chiffres si la 1re ligne (logo + plateforme + €/km + prix + €/h) dépasse
-     * la largeur de la carte : sinon le €/h, dernier élément, était coupé ("27" au lieu de "27€/h").
+     * Ajuste les tailles pour que rien ne soit coupé :
+     *  - la ligne de chiffres (et le verdict en mode Compact) tient sur la largeur de la carte ;
+     *  - le verdict XXL (texte perso, 12 caractères / 2 emojis max) remplit la largeur sans déborder.
      */
-    private fun fitFirstRow() {
+    private fun fitTexts() {
         if (rowAvailablePx <= 0) return
-        fun apply(f: Float) {
-            platformTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f * f)
-            perKmTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, bigSp * f)
-            priceTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, (bigSp + 2f) * f)
-            hourlyTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, bigSp * f)
+        val compact = layout == PopupLayout.COMPACT
+        val k = if (compact) 0.72f else 1f
+        val rowViews = buildList {
+            add(platformTv to 12f * (if (compact) 0.9f else 1f))
+            add(perKmTv to bigSp * k)
+            add(priceTv to (bigSp + 2f) * k)
+            add(hourlyTv to bigSp * k)
+            if (compact) verdictTv?.let { add(it to bigSp * 0.75f) }
         }
-        fun needed(): Float =
-            dp(22f + 6f + 8f + 16f) + // logo + marge + padding plateforme + espace mini entre blocs
-                listOf(platformTv, perKmTv, priceTv, hourlyTv).sumOf {
-                    Layout.getDesiredWidth(it.text, it.paint).toDouble()
-                }.toFloat()
+        val fixedDp = if (compact) 18f + 6f + 8f + 8f + 10f + 8f else 22f + 6f + 8f + 16f
+        fun apply(f: Float) = rowViews.forEach { (tv, base) -> tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, base * f) }
+        fun needed(): Float = dp(fixedDp) + rowViews.sumOf { (tv, _) -> Layout.getDesiredWidth(tv.text, tv.paint).toDouble() }.toFloat()
 
         apply(1f)
         val need = needed()
         if (need > rowAvailablePx) apply((rowAvailablePx / need) * 0.97f)
+
+        if (layout == PopupLayout.XXL) verdictTv?.let { tv ->
+            val base = bigSp * 2f
+            tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, base)
+            val w = Layout.getDesiredWidth(tv.text, tv.paint)
+            val avail = rowAvailablePx * 0.96f
+            if (w > avail) tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, base * avail / w)
+        }
     }
 
     // ------------------------------------------------------------------
     private fun text(sizeSp: Float, color: Int) = TextView(context).apply {
         setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         setTextColor(color)
-        typeface = mono
+        typeface = popupTypeface()
         maxLines = 1
         includeFontPadding = false
     }

@@ -150,6 +150,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         }
 
         Spacer(Modifier.height(16.dp))
+        PopupSection()
+
+        Spacer(Modifier.height(16.dp))
         ColorsSection()
 
         Spacer(Modifier.height(24.dp))

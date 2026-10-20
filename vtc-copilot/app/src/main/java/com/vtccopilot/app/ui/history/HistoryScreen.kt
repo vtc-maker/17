@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vtccopilot.app.data.local.entity.RideEntity
 import com.vtccopilot.app.data.local.entity.RideStatus
 import com.vtccopilot.app.data.prefs.AppColors
+import com.vtccopilot.app.data.prefs.PopupPrefs
 import com.vtccopilot.app.ui.common.PeriodBar
 import com.vtccopilot.app.ui.common.platformName
 import com.vtccopilot.app.ui.common.rideScore100
@@ -251,7 +252,7 @@ private fun RideCard(
     val context = LocalContext.current
     val timeFmt = remember { SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE) }
     val color = scoreColor(context, ride.score)
-    val title = highlight ?: verdictLabel(ride.score)
+    val title = highlight ?: PopupPrefs.label(context, ride.score)
     val km = totalKm(ride.approachDistanceKm, ride.rideDistanceKm)
 
     Card(
@@ -315,13 +316,6 @@ private fun RideCard(
             extra?.invoke()
         }
     }
-}
-
-private fun verdictLabel(score: String) = when (score) {
-    "GREEN" -> "Super"
-    "ORANGE" -> "Moyen"
-    "RED" -> "Mauvais"
-    else -> "—"
 }
 
 private fun scoreColor(context: Context, score: String): Color = when (score) {

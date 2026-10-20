@@ -11,6 +11,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.View
+import com.vtccopilot.app.data.prefs.PopupTheme
 
 /**
  * Jauge de rentabilité : barre colorée jusqu'au point, repère "seuil rentable"
@@ -19,14 +20,10 @@ import android.view.View
  * Position du point = ratio × [THRESHOLD_POS] (le seuil est donc toujours au même endroit).
  */
 @SuppressLint("ViewConstructor")
-class GaugeView(context: Context, mono: Typeface) : View(context) {
+class GaugeView(context: Context, mono: Typeface, private val theme: PopupTheme) : View(context) {
 
     companion object {
         const val THRESHOLD_POS = 0.6f
-        private const val TRACK = 0xFF252A28.toInt()
-        private const val RING = 0xFF0C0F0E.toInt()
-        private const val TICK = 0xFFE6E9EC.toInt()
-        private const val SMALL_TEXT = 0xFFD5D9DD.toInt()
         private const val THRESHOLD_LABEL = "seuil rentable"
     }
 
@@ -34,14 +31,14 @@ class GaugeView(context: Context, mono: Typeface) : View(context) {
     private var color: Int = Color.GRAY
     private var label: String = ""
 
-    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TRACK }
+    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.track }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = RING }
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.ring }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TICK }
+    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.tick }
     private val smallText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = mono; textSize = sp(11f); color = SMALL_TEXT; textAlign = Paint.Align.CENTER
+        typeface = mono; textSize = sp(11f); color = theme.small; textAlign = Paint.Align.CENTER
     }
     private val verdictText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create(mono, Typeface.BOLD); textSize = sp(14f)
@@ -79,14 +76,22 @@ class GaugeView(context: Context, mono: Typeface) : View(context) {
         c.drawText(THRESHOLD_LABEL, tickX.coerceIn(left + half, right - half), y + dp(25f), smallText)
 
         if (dotX != null) {
-            glowPaint.shader = RadialGradient(dotX, y, dp(18f), alpha(color, 0.55f), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-            c.drawCircle(dotX, y, dp(18f), glowPaint)
+            if (theme.glow > 0f) {
+                glowPaint.shader = RadialGradient(dotX, y, dp(18f), alpha(color, 0.55f), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                c.drawCircle(dotX, y, dp(18f), glowPaint)
+            }
             c.drawCircle(dotX, y, dp(9f), ringPaint)
             dotPaint.color = color
             c.drawCircle(dotX, y, dp(6.5f), dotPaint)
 
             verdictText.color = color
-            verdictText.setShadowLayer(dp(8f), 0f, 0f, alpha(color, 0.7f))
+            if (theme.glow > 0f) verdictText.setShadowLayer(dp(8f * theme.glow), 0f, 0f, alpha(color, 0.7f))
+            else verdictText.clearShadowLayer()
+            // Texte personnalisé (12 caractères max) : réduit s'il dépasse la moitié de la jauge.
+            verdictText.textSize = sp(14f)
+            val maxW = w * 0.5f
+            val measured = verdictText.measureText(label)
+            if (measured > maxW) verdictText.textSize = sp(14f) * maxW / measured
             val vHalf = verdictText.measureText(label) / 2
             c.drawText(label, dotX.coerceIn(left + vHalf, right - vHalf), y - dp(15f), verdictText)
         }
