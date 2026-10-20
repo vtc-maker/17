@@ -100,3 +100,6 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - AcceptanceTracker.tick() + minuteur 3 s dans RideAccessibilityService : une offre plus relue depuis 12 s est considérée disparue, puis enregistrée 'à valider' après 30 s si aucun écran de décision n'est vu (Bolt n'envoie plus d'événements après expiration).
 - Ajout de textes d'écran Bolt (commande expirée, hors ligne, glisser pour arriver…).
 - 11 tests JVM AcceptanceTracker OK.
+
+## 2026-10-20 – Renommage complet en VTC Copilot
+- Dossier projet : /app/vtc-copilot ; applicationId/namespace : com.vtccopilot.app ; plus aucune mention 'drivee' (classes VtcCopilot*, thème, prefs, base vtccopilot.db, docs).

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============================================================= -->
+    <!--  PERMISSIONS                                                  -->
+    <!-- ============================================================= -->
+
+    <!-- Notification "VTC Copilot actif" (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Demander l'exclusion de l'optimisation batterie (Doze) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!--
+      La pop-up est affichée par le service d'accessibilité (TYPE_ACCESSIBILITY_OVERLAY) :
+      ni SYSTEM_ALERT_WINDOW ni foreground service ne sont nécessaires.
+      L'accès à l'AccessibilityService n'exige PAS de <uses-permission> côté app :
+      c'est le SERVICE qui se protège via android:permission="BIND_ACCESSIBILITY_SERVICE"
+      (voir plus bas). L'utilisateur active le service manuellement dans les Réglages.
+    -->
+
+    <application
+        android:name=".VtcCopilotApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VtcCopilot"
+        tools:targetApi="34">
+
+        <!-- ========================================================= -->
+        <!--  ACTIVITÉ PRINCIPALE (Compose)                            -->
+        <!-- ========================================================= -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VtcCopilot">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ========================================================= -->
+        <!--  SERVICE D'ACCESSIBILITÉ (le "scraper" d'écran)           -->
+        <!--  Doit être protégé par BIND_ACCESSIBILITY_SERVICE afin    -->
+        <!--  que seul le système puisse s'y lier.                     -->
+        <!-- ========================================================= -->
+        <service
+            android:name=".service.accessibility.RideAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <!-- Fichier de configuration des flags/paquets écoutés -->
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ========================================================= -->
+        <!--  FILE PROVIDER — partage du fichier CSV exporté           -->
+        <!-- ========================================================= -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

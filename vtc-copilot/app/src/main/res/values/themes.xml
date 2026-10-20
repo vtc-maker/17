@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Thème de base pour l'Activity (Compose gère le reste). -->
+    <style name="Theme.VtcCopilot" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0E1116</item>
+        <item name="android:navigationBarColor">#0E1116</item>
+        <item name="android:windowBackground">#0E1116</item>
+    </style>
+</resources>
