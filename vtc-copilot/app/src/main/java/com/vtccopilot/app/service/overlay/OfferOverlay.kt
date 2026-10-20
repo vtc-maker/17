@@ -1,5 +1,7 @@
 package com.vtccopilot.app.service.overlay
 
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
@@ -7,6 +9,7 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Handler
 import android.os.Looper
 import android.text.Layout
@@ -20,6 +23,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -84,6 +88,8 @@ class OfferOverlay(private val context: Context) {
     private var tripTv: TextView? = null
     private var verdictTv: TextView? = null
     private var gauge: GaugeView? = null
+    private var neonBorder: GradientDrawable? = null
+    private var neonAnimator: ValueAnimator? = null
     private var bigSp = 26f
     private var rowAvailablePx = 0
 
@@ -148,6 +154,8 @@ class OfferOverlay(private val context: Context) {
 
     private fun removeNow() {
         main.removeCallbacks(dismissRunnable)
+        neonAnimator?.cancel()
+        neonAnimator = null
         val v = root ?: return
         root = null
         runCatching { wm.removeViewImmediate(v) }.onFailure { Log.w(TAG, "removeView a échoué", it) }
@@ -165,13 +173,23 @@ class OfferOverlay(private val context: Context) {
         val compact = layout == PopupLayout.COMPACT
         val outer = FrameLayout(context).apply { setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(6f)) }
 
+        neonBorder = null
+        val radius = dp(if (compact) min(theme.radiusDp, 18f) else theme.radiusDp)
         card = FrameLayout(context).apply {
-            background = GradientDrawable().apply {
+            background = if (theme == PopupTheme.NEON) neonBackground(radius) else GradientDrawable().apply {
                 setColor(theme.bg)
-                cornerRadius = dp(if (compact) min(theme.radiusDp, 18f) else theme.radiusDp)
+                cornerRadius = radius
                 setStroke(dpi(theme.strokeDp), theme.stroke)
             }
             elevation = dp(8f)
+        }
+        if (theme == PopupTheme.NEON) {
+            // Halo rose diffus autour de la carte.
+            outer.background = GradientDrawable().apply {
+                cornerRadius = radius + dp(6f)
+                setColor(Color.TRANSPARENT)
+                setStroke(dpi(6f), withAlpha(PopupTheme.NEON_PINK, 0.35f))
+            }
         }
         outer.addView(card, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
 
@@ -285,6 +303,14 @@ class OfferOverlay(private val context: Context) {
             it.setTextColor(color)
             glow(it, color, 12f)
         }
+        if (theme == PopupTheme.NEON) {
+            // Chaque chiffre dans sa couleur fluo, avec halo.
+            platformTv.setTextColor(PopupTheme.NEON_YELLOW); glow(platformTv, PopupTheme.NEON_YELLOW, 6f)
+            perKmTv.setTextColor(PopupTheme.NEON_CYAN); glow(perKmTv, PopupTheme.NEON_CYAN, 8f)
+            hourlyTv.setTextColor(PopupTheme.NEON_PINK); glow(hourlyTv, PopupTheme.NEON_PINK, 8f)
+            tripTv?.let { it.setTextColor(PopupTheme.NEON_LIME); glow(it, PopupTheme.NEON_LIME, 5f) }
+            startNeonAnimation()
+        }
         fitTexts()
 
         if (theme.strokeIsVerdict) (card.background as? GradientDrawable)?.setStroke(dpi(theme.strokeDp), color)
@@ -293,6 +319,45 @@ class OfferOverlay(private val context: Context) {
             intArrayOf(Color.TRANSPARENT, color, Color.TRANSPARENT)
         )
         gauge?.update(d.thresholdRatio, color, label)
+    }
+
+    /** Fond Néon : bordure dégradée cyan → rose → jaune (animée) autour d'un fond violet nuit. */
+    private fun neonBackground(radius: Float): LayerDrawable {
+        val border = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(PopupTheme.NEON_CYAN, PopupTheme.NEON_PINK, PopupTheme.NEON_YELLOW, PopupTheme.NEON_CYAN)
+        ).apply { cornerRadius = radius }
+        val inner = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0xFA1A0033.toInt(), theme.bg)
+        ).apply { cornerRadius = (radius - dp(theme.strokeDp)).coerceAtLeast(0f) }
+        neonBorder = border
+        val inset = dpi(theme.strokeDp)
+        return LayerDrawable(arrayOf(border, inner)).apply { setLayerInset(1, inset, inset, inset, inset) }
+    }
+
+    /** Fait tourner les couleurs de la bordure Néon en continu (effet enseigne lumineuse). */
+    private fun startNeonAnimation() {
+        if (neonAnimator != null) return
+        val border = neonBorder ?: return
+        val base = intArrayOf(PopupTheme.NEON_CYAN, PopupTheme.NEON_PINK, PopupTheme.NEON_YELLOW, PopupTheme.NEON_LIME)
+        val evaluator = ArgbEvaluator()
+        neonAnimator = ValueAnimator.ofFloat(0f, base.size.toFloat()).apply {
+            duration = 2_400L
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            addUpdateListener { a ->
+                val t = a.animatedValue as Float
+                val colors = IntArray(4) { i ->
+                    val pos = (t + i) % base.size
+                    val from = base[pos.toInt() % base.size]
+                    val to = base[(pos.toInt() + 1) % base.size]
+                    evaluator.evaluate(pos - pos.toInt(), from, to) as Int
+                }
+                border.colors = colors
+            }
+            start()
+        }
     }
 
     private fun glow(tv: TextView, color: Int, radiusDp: Float) {

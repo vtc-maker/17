@@ -35,12 +35,20 @@ enum class PopupTheme(
         1f, 0xFF252A28.toInt(), 0xFF0C0F0E.toInt(), 0xFFE6E9EC.toInt(), 0xFFD5D9DD.toInt(), false),
     CLASSE("Classe", 0xF5101012.toInt(), 0x99C9A961.toInt(), 1f, false, 14f, 0xFFF5EFE0.toInt(), 0xFFCFC6B0.toInt(),
         0f, 0xFF2A2721.toInt(), 0xFF101012.toInt(), 0xFFC9A961.toInt(), 0xFFC9A961.toInt(), false),
-    NEON("Néon", 0xF2050611.toInt(), 0xFFFFFFFF.toInt(), 2f, true, 22f, 0xFFFFFFFF.toInt(), 0xFFB8C4FF.toInt(),
-        2f, 0xFF151833.toInt(), 0xFF050611.toInt(), 0xFFFFFFFF.toInt(), 0xFF9FB0FF.toInt(), false),
+    NEON("Néon", 0xF50B0019.toInt(), 0xFFFF2BD6.toInt(), 3f, false, 22f, 0xFF00F0FF.toInt(), 0xFFFF2BD6.toInt(),
+        3f, 0xFF2A0A40.toInt(), 0xFF0B0019.toInt(), 0xFFFFF200.toInt(), 0xFFFF2BD6.toInt(), false),
     RETRO("Rétro", 0xFAF3E5C4.toInt(), 0xFF2B2118.toInt(), 3f, false, 4f, 0xFF2B2118.toInt(), 0xFF5A4A38.toInt(),
         0f, 0xFFD9C79E.toInt(), 0xFF2B2118.toInt(), 0xFF2B2118.toInt(), 0xFF5A4A38.toInt(), true);
 
     /** Couleur du verdict adaptée au style. */
+    companion object {
+        /** Couleurs fluo du style Néon (bordure arc-en-ciel animée, chiffres colorés). */
+        const val NEON_CYAN = 0xFF00F0FF.toInt()
+        const val NEON_PINK = 0xFFFF2BD6.toInt()
+        const val NEON_YELLOW = 0xFFFFF200.toInt()
+        const val NEON_LIME = 0xFF39FF14.toInt()
+    }
+
     fun verdictColor(color: Int): Int {
         if (!darkenVerdict) return color
         val f = 0.62f

@@ -25,7 +25,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -137,7 +140,13 @@ private fun PopupPreview(theme: PopupTheme, labels: List<Pair<String, Int>>) {
     Column(
         Modifier.fillMaxWidth()
             .background(Color(theme.bg), shape)
-            .border(theme.strokeDp.dp, Color(if (theme.strokeIsVerdict) labels.first().second else theme.stroke), shape)
+            .then(
+                if (theme == PopupTheme.NEON) Modifier.border(
+                    theme.strokeDp.dp,
+                    Brush.linearGradient(listOf(Color(PopupTheme.NEON_CYAN), Color(PopupTheme.NEON_PINK), Color(PopupTheme.NEON_YELLOW))),
+                    shape
+                ) else Modifier.border(theme.strokeDp.dp, Color(if (theme.strokeIsVerdict) labels.first().second else theme.stroke), shape)
+            )
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -149,6 +158,7 @@ private fun PopupPreview(theme: PopupTheme, labels: List<Pair<String, Int>>) {
                 fontFamily = family,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
+                style = if (theme.glow > 1f) TextStyle(shadow = Shadow(Color(color), blurRadius = 18f)) else TextStyle.Default,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

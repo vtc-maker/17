@@ -108,3 +108,4 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - Réglages > Pop-up : textes des verdicts (12 caractères / 2 emojis max, VerdictLabel.sanitize), utilisés dans la pop-up, la jauge et l'historique (PopupPrefs.label).
 - 3 mises en page (Complet, Compact, Verdict XXL) × 4 styles (Actuel, Classe, Néon, Rétro) : PopupPrefs / PopupTheme, OfferOverlay reconstruit la vue si le réglage change ; textes auto-réduits pour tenir dans la carte.
 - Tests JVM VerdictLabelTest (26 tests OK au total sur les suites exécutées).
+- 2026-10-20 Néon plus flashy : bordure dégradée cyan/rose/jaune animée, halo rose, chiffres fluo (cyan €/km, rose €/h, jaune plateforme, vert trajet), fond violet nuit.
