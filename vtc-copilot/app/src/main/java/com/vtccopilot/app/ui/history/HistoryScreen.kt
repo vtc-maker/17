@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +76,37 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     val context = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<RideEntity?>(null) }
+    var toEdit by remember { mutableStateOf<RideEntity?>(null) }
+
+    // Appui long sur une course : corriger son statut (erreur de catégorisation).
+    toEdit?.let { ride ->
+        AlertDialog(
+            onDismissRequest = { toEdit = null },
+            title = { Text("Modifier cette course") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${platformName(ride.sourcePackage)} · " +
+                            (ride.grossPriceEuros?.let { String.format(Locale.FRANCE, "%.2f €", it) } ?: "—") + " · " +
+                            SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(Date(ride.capturedAtEpochMs))
+                    )
+                    listOf(
+                        RideStatus.ACCEPTED to "Prise ✓",
+                        RideStatus.REJECTED to "Pas prise",
+                        RideStatus.PENDING to "À valider plus tard"
+                    ).forEach { (status, label) ->
+                        val current = ride.status == status
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !current,
+                            onClick = { viewModel.setStatus(ride.id, status); toEdit = null }
+                        ) { Text(if (current) "$label (actuel)" else label) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { toEdit = null }) { Text("Fermer") } }
+        )
+    }
 
     toDelete?.let { ride ->
         AlertDialog(
@@ -157,7 +191,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
         if (state.pending.isNotEmpty()) {
             item { SectionTitle("À valider", state.pending.size, Color(0xFFF5A524)) }
             items(state.pending, key = { "p${it.id}" }) { ride ->
-                RideCard(ride, highlight = null, onDelete = { toDelete = ride }) {
+                RideCard(ride, highlight = null, onDelete = { toDelete = ride }, onLongPress = { toEdit = ride }) {
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
@@ -218,7 +252,8 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                 RideCard(
                     ride,
                     highlight = if (state.tab == HistoryTab.NOT_TAKEN) "Pas pris" else null,
-                    onDelete = { toDelete = ride }
+                    onDelete = { toDelete = ride },
+                    onLongPress = { toEdit = ride }
                 )
             }
         }
@@ -243,11 +278,13 @@ private fun SectionTitle(title: String, count: Int, color: Color) {
 }
 
 /** Carte d'une course : badge note, verdict (ou "Pas pris"), plateforme, km · €/km, prix, heure. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RideCard(
     ride: RideEntity,
     highlight: String?,
     onDelete: () -> Unit,
+    onLongPress: () -> Unit,
     extra: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -257,7 +294,10 @@ private fun RideCard(
     val km = totalKm(ride.approachDistanceKm, ride.rideDistanceKm)
 
     Card(
-        modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(16.dp)),
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Modifier le statut")
+            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

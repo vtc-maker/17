@@ -13,6 +13,13 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
+      100 % HORS LIGNE : ML Kit (OCR, modèle intégré à l'APK) ajoute ces permissions pour envoyer
+      des statistiques d'usage anonymes à Google. On les retire : aucune donnée ne sort du téléphone.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
+    <!--
       La pop-up est affichée par le service d'accessibilité (TYPE_ACCESSIBILITY_OVERLAY) :
       ni SYSTEM_ALERT_WINDOW ni foreground service ne sont nécessaires.
       L'accès à l'AccessibilityService n'exige PAS de <uses-permission> côté app :

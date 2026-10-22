@@ -110,3 +110,4 @@ Audit statique complet du projet + compilation JVM (kotlinc 1.9.22, JDK 17) des 
 - Tests JVM VerdictLabelTest (26 tests OK au total sur les suites exécutées).
 - 2026-10-20 Néon plus flashy : bordure dégradée cyan/rose/jaune animée, halo rose, chiffres fluo (cyan €/km, rose €/h, jaune plateforme, vert trajet), fond violet nuit.
 - 2026-10-20 Prix Bolt : bonus '+X€', €/km, 'jusqu'à', 'revenus supplémentaires' exclus ; ligne 'Net, TTC' prioritaire. Journal : section 'TEXTES DE LA DERNIÈRE OFFRE DÉTECTÉE'. Historique : km et €/km sur 2 lignes, titre non coupé (boutons sous le titre). 42 tests JVM OK.
+- 2026-10-22 App 100% hors ligne : INTERNET/ACCESS_NETWORK_STATE retirées du manifeste (tools:node=remove, ajoutées par ML Kit pour sa télémétrie). Historique : appui long sur une course = changer son statut (Prise / Pas prise / À valider).
